@@ -106,8 +106,8 @@ async def init_db():
                 await db.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'")
 
         # *** ДОБАВЛЯЕМ новую колонку для Такелаж ***
-            if "menu2_takelage" not in cols:
-                await db.execute("ALTER TABLE user_settings ADD COLUMN menu2_takelage TEXT DEFAULT 'не указано'")
+        if "menu2_takelage" not in cols:
+            await db.execute("ALTER TABLE user_settings ADD COLUMN menu2_takelage TEXT DEFAULT 'не указано'")
 
         # ─── добавляем колонки для меню 3 ────────────────────────
         for col in ("menu3_km", "menu3_mop", "menu3_margin"):
