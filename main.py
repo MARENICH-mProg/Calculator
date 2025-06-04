@@ -1,6 +1,7 @@
 #API_TOKEN = "7908411125:AAFxJdhRYxke3mLVRa4Gxxy1Ow2dNk4Sf5w"
 
 import asyncio
+from db import connection
 
 import aiosqlite
 from aiogram import Bot, Dispatcher, types
@@ -12,7 +13,7 @@ from aiogram.types import (CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, Message)
 
 API_TOKEN = "7908411125:AAFxJdhRYxke3mLVRa4Gxxy1Ow2dNk4Sf5w"
-DB_PATH   = "settings.db"
+
 
 
 # ─── 1) Определяем FSM-состояния ─────────────────────────────
@@ -40,7 +41,7 @@ class Settings(StatesGroup):
 
 # ─── 2) Инициализация базы ────────────────────────────────────
 async def init_db():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         # 1) Создаём основную таблицу (unit + tax_percent)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS user_settings (
@@ -120,14 +121,14 @@ async def init_db():
 
 # ─── 3) Работа с БД ──────────────────────────────────────────
 async def get_unit(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT unit FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не выбрано"
 
 
 async def set_unit(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, unit)
             VALUES (?, ?)
@@ -137,14 +138,14 @@ async def set_unit(chat_id: int, value: str):
 
 
 async def get_tax(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT tax_percent FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 
 async def set_tax(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, tax_percent)
             VALUES (?, ?)
@@ -154,13 +155,13 @@ async def set_tax(chat_id: int, value: str):
 
 # ─── вставьте ниже утилиты для measurement ──────────────────
 async def get_measurement_fix(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT measurement_fix FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_measurement_fix(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, measurement_fix)
             VALUES (?, ?)
@@ -169,19 +170,19 @@ async def set_measurement_fix(chat_id: int, value: str):
         await db.commit()
 
 async def get_measurement_km(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT measurement_km FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def get_master_salary(chat_id: int, key: str) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute(f"SELECT {key} FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_master_salary(chat_id: int, key: str, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute(f"""
             INSERT INTO user_settings(chat_id, {key})
             VALUES (?, ?)
@@ -191,13 +192,13 @@ async def set_master_salary(chat_id: int, key: str, value: str):
 
 # ─── вставьте сразу после set_master_salary ─────────────────
 async def get_salary(chat_id: int, column: str) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute(f"SELECT {column} FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_salary(chat_id: int, column: str, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute(f"""
             INSERT INTO user_settings(chat_id, {column})
             VALUES (?, ?)
@@ -208,7 +209,7 @@ async def set_salary(chat_id: int, column: str, value: str):
 
 # ─── после set_salary добавьте:
 async def get_general_stone_type(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute(
             "SELECT general_stone_type FROM user_settings WHERE chat_id = ?", (chat_id,)
         )
@@ -216,7 +217,7 @@ async def get_general_stone_type(chat_id: int) -> str:
         return row[0] if row else "не указано"
 
 async def set_general_stone_type(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, general_stone_type)
             VALUES (?, ?)
@@ -225,7 +226,7 @@ async def set_general_stone_type(chat_id: int, value: str):
         await db.commit()
 
 async def get_price_per_meter(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute(
             "SELECT price_per_meter FROM user_settings WHERE chat_id = ?", (chat_id,)
         )
@@ -234,13 +235,13 @@ async def get_price_per_meter(chat_id: int) -> str:
 
 # ─── после set_price_per_meter ───────────────────────────────
 async def get_menu2_countertop(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT menu2_countertop FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_menu2_countertop(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, menu2_countertop)
             VALUES (?, ?)
@@ -249,13 +250,13 @@ async def set_menu2_countertop(chat_id: int, value: str):
         await db.commit()
 
 async def get_menu2_wall(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT menu2_wall FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_menu2_wall(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, menu2_wall)
             VALUES (?, ?)
@@ -264,13 +265,13 @@ async def set_menu2_wall(chat_id: int, value: str):
         await db.commit()
 
 async def get_menu2_boil(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT menu2_boil FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_menu2_boil(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, menu2_boil)
             VALUES (?, ?)
@@ -279,13 +280,13 @@ async def set_menu2_boil(chat_id: int, value: str):
         await db.commit()
 
 async def get_menu2_sink(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT menu2_sink FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_menu2_sink(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, menu2_sink)
             VALUES (?, ?)
@@ -294,13 +295,13 @@ async def set_menu2_sink(chat_id: int, value: str):
         await db.commit()
 
 async def get_menu2_glue(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT menu2_glue FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_menu2_glue(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, menu2_glue)
             VALUES (?, ?)
@@ -309,13 +310,13 @@ async def set_menu2_glue(chat_id: int, value: str):
         await db.commit()
 
 async def get_menu2_edges(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT menu2_edges FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_menu2_edges(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, menu2_edges)
             VALUES (?, ?)
@@ -325,13 +326,13 @@ async def set_menu2_edges(chat_id: int, value: str):
 
 # … после get_menu2_edges и set_menu2_edges …
 async def get_menu2_takelage(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT menu2_takelage FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_menu2_takelage(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, menu2_takelage)
             VALUES (?, ?)
@@ -358,13 +359,13 @@ async def menu2_takelage_menu(call: CallbackQuery, state: FSMContext):
 
 # ─── геттеры/сеттеры для меню 3 ─────────────────────────────
 async def get_menu3_km(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT menu3_km FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_menu3_km(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, menu3_km)
             VALUES (?, ?)
@@ -373,13 +374,13 @@ async def set_menu3_km(chat_id: int, value: str):
         await db.commit()
 
 async def get_menu3_mop(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT menu3_mop FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_menu3_mop(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, menu3_mop)
             VALUES (?, ?)
@@ -388,13 +389,13 @@ async def set_menu3_mop(chat_id: int, value: str):
         await db.commit()
 
 async def get_menu3_margin(chat_id: int) -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         cur = await db.execute("SELECT menu3_margin FROM user_settings WHERE chat_id = ?", (chat_id,))
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
 async def set_menu3_margin(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, menu3_margin)
             VALUES (?, ?)
@@ -405,7 +406,7 @@ async def set_menu3_margin(chat_id: int, value: str):
 # ─── далее продолжается остальной код ────────────────────────
 
 async def set_price_per_meter(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, price_per_meter)
             VALUES (?, ?)
@@ -416,7 +417,7 @@ async def set_price_per_meter(chat_id: int, value: str):
 
 
 async def set_measurement_km(chat_id: int, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with connection() as db:
         await db.execute("""
             INSERT INTO user_settings(chat_id, measurement_km)
             VALUES (?, ?)
