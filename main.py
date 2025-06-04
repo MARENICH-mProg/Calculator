@@ -3,14 +3,14 @@
 import asyncio
 from db import connection
 
+import aiosqlite
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.fsm.state import State, StatesGroup
-
+from aiogram.types import (CallbackQuery, InlineKeyboardButton,
+                           InlineKeyboardMarkup, Message)
 
 API_TOKEN = "7908411125:AAFxJdhRYxke3mLVRa4Gxxy1Ow2dNk4Sf5w"
 
@@ -31,7 +31,6 @@ class Settings(StatesGroup):
     menu2 = State()  # второй экран меню
     stone2 = State()  # ввод «Тип камня» на меню 2
     price_meter = State()  # ввод «Цена за метр» на меню 2
-    menu2_item = State()  # для ввода Столешница/Стеновая/…/Бортики
     menu2_item = State()  # для ввода Столешница/Стеновая/…/Бортики
     menu2_takelage = State()  # *** новое состояние для выбора «такелаж» ***
     # ─── добавляем подменю 3 ────────────────────────────────
