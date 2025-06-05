@@ -394,13 +394,14 @@ async def menu2_takelage_menu(call: CallbackQuery, state: FSMContext):
     await state.update_data(menu2_message_id=data["menu2_message_id"])
 
     # 2) Показываем юзеру две кнопки «Да» / «Нет»
-    await call.message.edit_text(
+    msg = await call.message.answer(
         "Такелаж: выберите «Да» или «Нет»:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Да",  callback_data="takel_yes")],
             [InlineKeyboardButton(text="Нет", callback_data="takel_no")],
         ])
     )
+    await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 
@@ -627,17 +628,21 @@ async def menu3_km_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.menu3_km)
     data = await state.get_data()
     await state.update_data(menu3_message_id=data["menu3_message_id"])
-    await call.message.edit_text("Введите количество КМ (целое число):")
+    msg = await call.message.answer("Введите количество КМ (целое число):")
+    await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def menu3_km_input(message: Message, state: FSMContext):
     data       = await state.get_data()
     menu3_id   = data["menu3_message_id"]
+    prompt_id  = data.get("prompt_id")
     text       = message.text.strip()
     if not text.isdigit():
         return await message.reply("Неверный формат. Введите целое число, например: 10")
     await set_menu3_km(message.chat.id, text)
     await message.delete()
+    if prompt_id:
+        await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
 
     await state.set_state(Settings.menu3)
     km_current     = await get_menu3_km(message.chat.id)
@@ -655,17 +660,21 @@ async def menu3_mop_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.menu3_mop)
     data = await state.get_data()
     await state.update_data(menu3_message_id=data["menu3_message_id"])
-    await call.message.edit_text("Введите проценты МОПу (целое число от 0 до 100):")
+    msg = await call.message.answer("Введите проценты МОПу (целое число от 0 до 100):")
+    await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def menu3_mop_input(message: Message, state: FSMContext):
     data       = await state.get_data()
     menu3_id   = data["menu3_message_id"]
+    prompt_id  = data.get("prompt_id")
     text       = message.text.strip()
     if not text.isdigit() or not (0 <= int(text) <= 100):
         return await message.reply("Неверный формат. Введите целое число от 0 до 100.")
     await set_menu3_mop(message.chat.id, text)
     await message.delete()
+    if prompt_id:
+        await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
 
     await state.set_state(Settings.menu3)
     km_current     = await get_menu3_km(message.chat.id)
@@ -683,17 +692,21 @@ async def menu3_margin_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.menu3_margin)
     data = await state.get_data()
     await state.update_data(menu3_message_id=data["menu3_message_id"])
-    await call.message.edit_text("Введите маржу в % (целое число от 0 до 100):")
+    msg = await call.message.answer("Введите маржу в % (целое число от 0 до 100):")
+    await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def menu3_margin_input(message: Message, state: FSMContext):
     data       = await state.get_data()
     menu3_id   = data["menu3_message_id"]
+    prompt_id  = data.get("prompt_id")
     text       = message.text.strip()
     if not text.isdigit() or not (0 <= int(text) <= 100):
         return await message.reply("Неверный формат. Введите целое число от 0 до 100.")
     await set_menu3_margin(message.chat.id, text)
     await message.delete()
+    if prompt_id:
+        await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
 
     await state.set_state(Settings.menu3)
     km_current     = await get_menu3_km(message.chat.id)
@@ -776,14 +789,16 @@ async def set_tax_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.tax)
     # Сохраняем ID этого сообщения
     await state.update_data(menu_message_id=call.message.message_id)
-    # Редактируем его под запрос
-    await call.message.edit_text("Введи, какой процент налогов ты платишь:")
+    # Отправляем отдельное сообщение с запросом
+    msg = await call.message.answer("Введи, какой процент налогов ты платишь:")
+    await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 
 async def tax_input(message: Message, state: FSMContext):
     data = await state.get_data()
     menu_id = data.get("menu_message_id")
+    prompt_id = data.get("prompt_id")
 
     text = message.text.strip().rstrip('%')
     if not text.isdigit():
@@ -792,8 +807,10 @@ async def tax_input(message: Message, state: FSMContext):
     # 1) Сохраняем процент в БД
     await set_tax(message.chat.id, text)
 
-    # 2) Удаляем сообщение пользователя с цифрой
+    # 2) Удаляем сообщение пользователя и подсказку
     await message.bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+    if prompt_id:
+        await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
 
     # 3) Завершаем FSM-состояние
     await state.clear()
@@ -823,14 +840,16 @@ async def meas_fix_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.meas_fix)
     data = await state.get_data()
     await state.update_data(menu_message_id=data["menu_message_id"])
-    await call.message.edit_text("Введите фиксированную стоимость выезда для замеров (₽):")
+    msg = await call.message.answer("Введите фиксированную стоимость выезда для замеров (₽):")
+    await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def meas_km_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.meas_km)
     data = await state.get_data()
     await state.update_data(menu_message_id=data["menu_message_id"])
-    await call.message.edit_text("Введите стоимость одного километра (₽):")
+    msg = await call.message.answer("Введите стоимость одного километра (₽):")
+    await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def meas_back(call: CallbackQuery, state: FSMContext):
@@ -845,11 +864,14 @@ async def meas_back(call: CallbackQuery, state: FSMContext):
 async def meas_fix_input(message: Message, state: FSMContext):
     data    = await state.get_data()
     menu_id = data["menu_message_id"]
+    prompt_id = data.get("prompt_id")
     text    = message.text.strip().rstrip('₽')
     if not text.isdigit():
         return await message.reply("Введите число, например: 3000")
     await set_measurement_fix(message.chat.id, text)
     await message.delete()
+    if prompt_id:
+        await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
     await state.set_state(Settings.meas_menu)
     fix = await get_measurement_fix(message.chat.id)
     km  = await get_measurement_km(message.chat.id)
@@ -863,11 +885,14 @@ async def meas_fix_input(message: Message, state: FSMContext):
 async def meas_km_input(message: Message, state: FSMContext):
     data    = await state.get_data()
     menu_id = data["menu_message_id"]
+    prompt_id = data.get("prompt_id")
     text    = message.text.strip().rstrip('₽')
     if not text.isdigit():
         return await message.reply("Введите число, например: 20")
     await set_measurement_km(message.chat.id, text)
     await message.delete()
+    if prompt_id:
+        await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
     await state.set_state(Settings.meas_menu)
     fix = await get_measurement_fix(message.chat.id)
     km  = await get_measurement_km(message.chat.id)
@@ -936,12 +961,16 @@ async def salary_item_menu(call: CallbackQuery, state: FSMContext):
       "glue":"Подклейка","edges":"Бортики",
       "delivery":"Доставка","takelage":"Такелаж",
     }[item]
-    await call.message.edit_text(f"Введите сумму для {label} ({'м2' if item in ['countertop','wall','edges','takelage'] else 'шт.'}):")
+    msg = await call.message.answer(
+        f"Введите сумму для {label} ({'м2' if item in ['countertop','wall','edges','takelage'] else 'шт.'}):"
+    )
+    await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def salary_item_input(message: Message, state: FSMContext):
     data   = await state.get_data()
     menu_id= data["menu_message_id"]
+    prompt_id = data.get("prompt_id")
     role, stone, item = data["role"], data["stone"], data["item"]
     text   = message.text.strip()
     if not text.isdigit():
@@ -952,6 +981,8 @@ async def salary_item_input(message: Message, state: FSMContext):
         text
     )
     await message.delete()
+    if prompt_id:
+        await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
     # возвращаемся в меню items
     await state.set_state(Settings.salary_stone)
     if role == "master":
@@ -1087,12 +1118,14 @@ async def price_meter_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.price_meter)
     data = await state.get_data()
     await state.update_data(menu2_message_id=data["menu2_message_id"])
-    await call.message.edit_text("Введите цену за метр (только цифры):")
+    msg = await call.message.answer("Введите цену за метр (только цифры):")
+    await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def price_meter_input(message: Message, state: FSMContext):
     data     = await state.get_data()
     menu2_id = data["menu2_message_id"]
+    prompt_id = data.get("prompt_id")
     text     = message.text.strip()
     if not text.isdigit():
         return await message.reply("Неверно. Введите число, например: 5000")
@@ -1100,6 +1133,8 @@ async def price_meter_input(message: Message, state: FSMContext):
     chat_id = message.chat.id
     await set_price_per_meter(chat_id, text)
     await message.delete()
+    if prompt_id:
+        await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
 
     await state.set_state(Settings.menu2)
 
@@ -1156,7 +1191,8 @@ async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
         "menu2_glue":      ("Подклейка",   "шт"),
         "menu2_edges":     ("Бортики",     "м2"),
     }[key]
-    await call.message.edit_text(f"Введите значение для {label} ({unit_type}):")
+    msg = await call.message.answer(f"Введите значение для {label} ({unit_type}):")
+    await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 # ─── 6.2) Обработка ввода текста для одной из шести строк ────
@@ -1164,6 +1200,7 @@ async def menu2_item_input(message: Message, state: FSMContext):
     data = await state.get_data()
     key = data["menu2_item_key"]          # «menu2_countertop» и т. д.
     menu2_id = data["menu2_message_id"]
+    prompt_id = data.get("prompt_id")
     text = message.text.strip()
 
     # 1) Определяем, для какого ключа ввод:
@@ -1198,8 +1235,10 @@ async def menu2_item_input(message: Message, state: FSMContext):
     }[key]
     await setter(message.chat.id, to_store)
 
-    # 4) Удаляем сообщение пользователя
+    # 4) Удаляем сообщение пользователя и подсказку
     await message.delete()
+    if prompt_id:
+        await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
 
     # 5) Возвращаемся в menu2, подгружая все шесть значений и остальные параметры заново
     await state.set_state(Settings.menu2)
@@ -1235,6 +1274,7 @@ async def menu2_takelage_input(call: CallbackQuery, state: FSMContext):
     # Возвращаем FSM в состояние Settings.menu2
     data = await state.get_data()
     menu2_id = data["menu2_message_id"]
+    prompt_id = data.get("prompt_id")
     await state.set_state(Settings.menu2)
 
     # Повторно читаем все поля, включая только что установленный takelage
@@ -1249,15 +1289,22 @@ async def menu2_takelage_input(call: CallbackQuery, state: FSMContext):
     ed   = await get_menu2_edges(chat_id)
     tak  = choice  # «да» или «нет»
 
+    # Удаляем сообщение с кнопками
+    await call.message.delete()
+    if prompt_id and prompt_id != call.message.message_id:
+        await call.message.bot.delete_message(chat_id=chat_id, message_id=prompt_id)
+
     # Перерисовываем меню 2
-    await call.message.edit_text(
+    await call.message.bot.edit_message_text(
         "Основное меню 2:",
         reply_markup=menu2_kb(
             current_stone, current_price,
             cntp, wal, bo, si, gl, ed,
             tak,
             unit
-        )
+        ),
+        chat_id=chat_id,
+        message_id=menu2_id,
     )
     await call.answer(f"Такелаж: {choice}")
 
