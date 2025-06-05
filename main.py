@@ -50,6 +50,8 @@ async def init_db():
                 tax_percent               TEXT    DEFAULT 'не указано',
                 measurement_fix           TEXT    DEFAULT 'не указано',
                 measurement_km            TEXT    DEFAULT 'не указано',
+                master_unit               TEXT    DEFAULT 'не выбрано',
+                installer_unit            TEXT    DEFAULT 'не выбрано',
                 master_acryl_countertop   TEXT    DEFAULT 'не указано',
                 master_acryl_wall         TEXT    DEFAULT 'не указано',
                 master_acryl_boil         TEXT    DEFAULT 'не указано',
@@ -72,6 +74,11 @@ async def init_db():
         for col in ("measurement_fix", "measurement_km"):
             if col not in cols:
                 await db.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'")
+
+        # 3a) Колонки единиц для ЗП мастера и монтажника
+        for col in ("master_unit", "installer_unit"):
+            if col not in cols:
+                await db.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не выбрано'")
 
         # 4) И добавляем все master_* колонки
         master_cols = [
@@ -134,6 +141,46 @@ async def set_unit(chat_id: int, value: str):
             VALUES (?, ?)
             ON CONFLICT(chat_id) DO UPDATE SET unit = excluded.unit
         """, (chat_id, value))
+        await db.commit()
+
+
+async def get_master_unit(chat_id: int) -> str:
+    async with connection() as db:
+        cur = await db.execute("SELECT master_unit FROM user_settings WHERE chat_id = ?", (chat_id,))
+        row = await cur.fetchone()
+        return row[0] if row else "не выбрано"
+
+
+async def set_master_unit(chat_id: int, value: str):
+    async with connection() as db:
+        await db.execute(
+            """
+            INSERT INTO user_settings(chat_id, master_unit)
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET master_unit = excluded.master_unit
+            """,
+            (chat_id, value),
+        )
+        await db.commit()
+
+
+async def get_installer_unit(chat_id: int) -> str:
+    async with connection() as db:
+        cur = await db.execute("SELECT installer_unit FROM user_settings WHERE chat_id = ?", (chat_id,))
+        row = await cur.fetchone()
+        return row[0] if row else "не выбрано"
+
+
+async def set_installer_unit(chat_id: int, value: str):
+    async with connection() as db:
+        await db.execute(
+            """
+            INSERT INTO user_settings(chat_id, installer_unit)
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET installer_unit = excluded.installer_unit
+            """,
+            (chat_id, value),
+        )
         await db.commit()
 
 
@@ -483,6 +530,7 @@ def salary_item_kb(role: str, stone: str, unit: str, values: dict[str,str]) -> I
             InlineKeyboardButton(text=f"Доставка | {values['delivery']}",            callback_data=f"salary_{role}_{stone}_delivery"),
             InlineKeyboardButton(text=f"Такелаж | {values['takelage']} | {unit}",     callback_data=f"salary_{role}_{stone}_takelage")
         ]]
+    kb.append([InlineKeyboardButton(text=f"Ед. измерения | {unit}", callback_data=f"salary_{role}_{stone}_unit")])
     kb.append([InlineKeyboardButton(text="← Назад", callback_data=f"salary_{role}_stone_back")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
@@ -906,7 +954,10 @@ async def salary_item_input(message: Message, state: FSMContext):
     await message.delete()
     # возвращаемся в меню items
     await state.set_state(Settings.salary_stone)
-    unit = await get_unit(message.chat.id)
+    if role == "master":
+        unit = await get_master_unit(message.chat.id)
+    else:
+        unit = await get_installer_unit(message.chat.id)
     # заново собрать values как в B)
     keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery","takelage"])
     values = {k: await get_salary(message.chat.id, f"{role}_{stone}_{k}") for k in keys}
@@ -916,6 +967,45 @@ async def salary_item_input(message: Message, state: FSMContext):
         message_id=menu_id,
         reply_markup=salary_item_kb(role, stone, unit, values)
     )
+
+
+async def salary_unit_menu(call: CallbackQuery, state: FSMContext):
+    parts = call.data.split("_")  # salary_role_stone_unit
+    role, stone = parts[1], parts[2]
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="м2", callback_data=f"salary_{role}_{stone}_unit_m2"),
+            InlineKeyboardButton(text="м/п", callback_data=f"salary_{role}_{stone}_unit_mp"),
+        ]
+    ])
+    await call.message.answer("Выберите единицу измерения:", reply_markup=kb)
+    await call.answer()
+
+
+async def salary_unit_choice(call: CallbackQuery, state: FSMContext):
+    parts = call.data.split("_")  # salary_role_stone_unit_m2/mp
+    role, stone, choice_part = parts[1], parts[2], parts[4]
+    choice = "м2" if choice_part == "m2" else "м/п"
+    chat_id = call.message.chat.id
+    if role == "master":
+        await set_master_unit(chat_id, choice)
+    else:
+        await set_installer_unit(chat_id, choice)
+
+    data = await state.get_data()
+    menu_id = data["menu_message_id"]
+    # восстановим значения
+    keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery","takelage"])
+    values = {k: await get_salary(chat_id, f"{role}_{stone}_{k}") for k in keys}
+    unit = choice
+    await call.message.bot.edit_message_text(
+        text=f"Установки для { 'акрилового' if stone=='acryl' else 'кварцевого' } камня:",
+        chat_id=chat_id,
+        message_id=menu_id,
+        reply_markup=salary_item_kb(role, stone, unit, values)
+    )
+    await call.message.delete()
+    await call.answer(f"Выбрано: {choice}")
 
 # ─── 6) Хендлеры для меню 2 ──────────────────────────────────
 
@@ -1177,6 +1267,8 @@ async def menu2_takelage_input(call: CallbackQuery, state: FSMContext):
 async def calculate_handler(call: CallbackQuery, state: FSMContext):
     chat_id = call.message.chat.id
     unit = await get_unit(chat_id)  # "м2" или "м/п"
+    master_unit = await get_master_unit(chat_id)
+    installer_unit = await get_installer_unit(chat_id)
 
     # ─── 1) Расчёт стоимости материала ────────────────────────────
     price_str = await get_price_per_meter(chat_id)       # строка, например "5000" или "не указано"
@@ -1279,12 +1371,12 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     master_log = [
         "\n📋 Расчёт ЗП мастера (тип камня: " + stone_text + "):\n",
         f"• Столешница:\n"
-        f"    цена мастера за {unit} = {fmt_price(price_ctp)} ₽, "
-        f"площадь = {disp(raw_val_ctp)} {unit} → "
+        f"    цена мастера за {master_unit} = {fmt_price(price_ctp)} ₽, "
+        f"площадь = {disp(raw_val_ctp)} {master_unit} → "
         f"{fmt_price(price_ctp)} × {disp(raw_val_ctp)} = {fmt_cost(cost_ctp)} ₽\n",
         f"• Стеновая:\n"
-        f"    цена мастера за {unit} = {fmt_price(price_wall)} ₽, "
-        f"площадь = {disp(raw_val_wall)} {unit} → "
+        f"    цена мастера за {master_unit} = {fmt_price(price_wall)} ₽, "
+        f"площадь = {disp(raw_val_wall)} {master_unit} → "
         f"{fmt_price(price_wall)} × {disp(raw_val_wall)} = {fmt_cost(cost_wall)} ₽\n",
         f"• Вырез варка:\n"
         f"    цена мастера за шт = {fmt_price(price_boil)} ₽, "
@@ -1299,8 +1391,8 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
         f"количество = {val_glue} шт → "
         f"{fmt_price(price_glue)} × {val_glue} = {fmt_cost(cost_glue)} ₽\n",
         f"• Бортики:\n"
-        f"    цена мастера за {unit} = {fmt_price(price_edges)} ₽, "
-        f"длина = {disp(raw_val_edges)} {unit} → "
+        f"    цена мастера за {master_unit} = {fmt_price(price_edges)} ₽, "
+        f"длина = {disp(raw_val_edges)} {master_unit} → "
         f"{fmt_price(price_edges)} × {disp(raw_val_edges)} = {fmt_cost(cost_edges)} ₽\n",
         "────────────────────────────────\n",
         f"Итого ЗП мастера: {fmt_cost(total_master)} ₽"
@@ -1342,12 +1434,12 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     inst_log = [
         "\n📋 Расчёт ЗП монтажника (тип камня: " + stone_text + "):\n",
         f"• Столешница:\n"
-        f"    цена монтажника за {unit} = {fmt_price(price_inst_ctp)} ₽, "
-        f"площадь = {disp(raw_val_ctp)} {unit} → "
+        f"    цена монтажника за {installer_unit} = {fmt_price(price_inst_ctp)} ₽, "
+        f"площадь = {disp(raw_val_ctp)} {installer_unit} → "
         f"{fmt_price(price_inst_ctp)} × {disp(raw_val_ctp)} = {fmt_cost(cost_inst_ctp)} ₽\n",
         f"• Стеновая:\n"
-        f"    цена монтажника за {unit} = {fmt_price(price_inst_wall)} ₽, "
-        f"площадь = {disp(raw_val_wall)} {unit} → "
+        f"    цена монтажника за {installer_unit} = {fmt_price(price_inst_wall)} ₽, "
+        f"площадь = {disp(raw_val_wall)} {installer_unit} → "
         f"{fmt_price(price_inst_wall)} × {disp(raw_val_wall)} = {fmt_cost(cost_inst_wall)} ₽\n",
         f"• Доставка:\n"
         f"    фиксированная сумма = {fmt_price(price_inst_deliv)} ₽\n",
@@ -1356,8 +1448,8 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     if raw_takel_flag == "да":
         inst_log += [
             f"• Такелаж:\n"
-            f"    цена монтажника за {unit} = {fmt_price(price_inst_takel)} ₽, "
-            f"суммарная длина = {disp(raw_val_ctp)} + {disp(raw_val_wall)} = {fmt_num(val_ctp + val_wall)} {unit} → "
+            f"    цена монтажника за {installer_unit} = {fmt_price(price_inst_takel)} ₽, "
+            f"суммарная длина = {disp(raw_val_ctp)} + {disp(raw_val_wall)} = {fmt_num(val_ctp + val_wall)} {installer_unit} → "
             f"{fmt_price(price_inst_takel)} × {fmt_num(val_ctp + val_wall)} = {fmt_cost(takelage_cost)} ₽\n"
         ]
     else:
@@ -1504,6 +1596,8 @@ async def main():
                 }
         )
     )
+    dp.callback_query.register(salary_unit_menu, lambda c: c.data.endswith("_unit"))
+    dp.callback_query.register(salary_unit_choice, lambda c: c.data.endswith("_unit_m2") or c.data.endswith("_unit_mp"))
     dp.message.register     (salary_item_input,     Settings.salary_item)
     # ─── Регистрация для меню 2 ─────────────────────────────
     dp.callback_query.register(to_menu2, lambda c: c.data == "to_menu2")
