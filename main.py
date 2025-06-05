@@ -1446,11 +1446,16 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     raw_inst_wall = await get_salary(chat_id, f"installer_{stone_key}_wall")
     raw_inst_deliv = await get_salary(chat_id, f"installer_{stone_key}_delivery")
     raw_inst_takel = await get_salary(chat_id, f"installer_{stone_key}_takelage")
+    # стоимость доставки за километры берём из настроек замеров
+    raw_meas_km = await get_measurement_km(chat_id)
+    raw_km_qty = await get_menu3_km(chat_id)
 
     price_inst_ctp = to_float_zero(raw_inst_ctp)
     price_inst_wall = to_float_zero(raw_inst_wall)
     price_inst_deliv = to_float_zero(raw_inst_deliv)
     price_inst_takel = to_float_zero(raw_inst_takel)
+    meas_km = to_float_zero(raw_meas_km)
+    km_qty = int(raw_km_qty) if raw_km_qty.isdigit() else 0
 
     # Количества/площади те же, что для мастера:
     # val_ctp, val_wall (float), val_boil, val_sink, val_glue, val_edges
@@ -1458,8 +1463,9 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     cost_inst_ctp = price_inst_ctp * val_ctp
     cost_inst_wall = price_inst_wall * val_wall
 
-    # Доставка — в любом случае прибавляем
-    cost_inst_delivery = price_inst_deliv
+    # Доставка: фиксированная сумма + стоимость километров
+    cost_inst_delivery_km = meas_km * km_qty
+    cost_inst_delivery = price_inst_deliv + cost_inst_delivery_km
 
     # Такелаж: смотрим флаг из БД (menu2_takelage: "да"/"нет")
     raw_takel_flag = await get_menu2_takelage(chat_id)  # "да"/"нет"/"не указано"
@@ -1483,6 +1489,7 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
         f"{fmt_price(price_inst_wall)} × {disp(raw_val_wall)} = {fmt_cost(cost_inst_wall)} ₽\n",
         f"• Доставка:\n"
         f"    фиксированная сумма = {fmt_price(price_inst_deliv)} ₽\n",
+        f"    {km_qty} км × {fmt_price(meas_km)} ₽/км = {fmt_cost(cost_inst_delivery_km)} ₽\n",
     ]
 
     if raw_takel_flag == "да":
@@ -1502,13 +1509,8 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
 
     # ─── 4) Расчёт стоимости замеров ────────────────────────────────
     raw_meas_fix = await get_measurement_fix(chat_id)  # строка, напр. "3000" или "не указано"
-    raw_meas_km = await get_measurement_km(chat_id)  # строка, напр. "20" или "не указано"
-    raw_km_qty = await get_menu3_km(chat_id)  # строка, напр. "10" или "не указано"
 
     meas_fix = to_float_zero(raw_meas_fix)
-    meas_km = to_float_zero(raw_meas_km)
-    # количество километров — целое число
-    km_qty = int(raw_km_qty) if raw_km_qty.isdigit() else 0
 
     cost_meas_km = meas_km * km_qty
     total_meas = meas_fix + cost_meas_km
