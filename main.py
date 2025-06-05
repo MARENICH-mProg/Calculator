@@ -475,9 +475,8 @@ async def set_measurement_km(chat_id: int, value: str):
 # ─── после этой строки идут функции main_menu и далее ────────
 
 # ─── 4) Построение главного меню ─────────────────────────────
-def main_menu(unit_value: str, tax_value: str, fix_value: str, km_value: str) -> InlineKeyboardMarkup:
+def main_menu(tax_value: str, fix_value: str, km_value: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"Единица измерения | {unit_value}", callback_data="set_unit")],
         [InlineKeyboardButton(text="ЗП Мастера", callback_data="salary_master")],
         [InlineKeyboardButton(text="ЗП Монтажника", callback_data="salary_installer")],
         [InlineKeyboardButton(text=f"Система налогов | {tax_value}%", callback_data="set_tax_system")],
@@ -600,11 +599,10 @@ async def start_handler(message: Message, state: FSMContext):
     # Сбросим любое текущее состояние
     await state.clear()
 
-    unit = await get_unit(message.chat.id)
     tax  = await get_tax(message.chat.id)
     fix = await get_measurement_fix(message.chat.id)
     km = await get_measurement_km(message.chat.id)
-    await message.answer("Привет! Настройте параметры:", reply_markup=main_menu(unit, tax, fix, km))
+    await message.answer("Привет! Настройте параметры:", reply_markup=main_menu(tax, fix, km))
 
 # ─── Хендлеры меню 3 ─────────────────────────────────────────
 
@@ -771,7 +769,6 @@ async def unit_choice(call: CallbackQuery, state: FSMContext):
     menu_id = data.get("menu_message_id")
 
     # Снова получаем обе настройки и редактируем то же сообщение
-    unit = await get_unit(call.message.chat.id)
     tax  = await get_tax(call.message.chat.id)
     fix = await get_measurement_fix(call.message.chat.id)
     km = await get_measurement_km(call.message.chat.id)
@@ -779,7 +776,7 @@ async def unit_choice(call: CallbackQuery, state: FSMContext):
         text="Параметры:",
         chat_id=call.message.chat.id,
         message_id=menu_id,
-        reply_markup=main_menu(unit, tax, fix, km)
+        reply_markup=main_menu(tax, fix, km)
     )
     await call.answer()
 
@@ -816,7 +813,6 @@ async def tax_input(message: Message, state: FSMContext):
     await state.clear()
 
     # 4) Редактируем то же сообщение-меню
-    unit = await get_unit(message.chat.id)
     tax  = await get_tax(message.chat.id)
     fix = await get_measurement_fix(message.chat.id)
     km = await get_measurement_km(message.chat.id)
@@ -824,7 +820,7 @@ async def tax_input(message: Message, state: FSMContext):
         text="Параметры:",
         chat_id=message.chat.id,
         message_id=menu_id,
-        reply_markup=main_menu(unit, tax, fix, km)
+        reply_markup=main_menu(tax, fix, km)
     )
 
 # ─── вставьте сюда хендлеры для measurement ────────────────
@@ -854,11 +850,10 @@ async def meas_km_menu(call: CallbackQuery, state: FSMContext):
 
 async def meas_back(call: CallbackQuery, state: FSMContext):
     await state.clear()
-    unit = await get_unit(call.message.chat.id)
     tax  = await get_tax(call.message.chat.id)
     fix  = await get_measurement_fix(call.message.chat.id)
     km   = await get_measurement_km(call.message.chat.id)
-    await call.message.edit_text("Параметры:", reply_markup=main_menu(unit, tax, fix, km))
+    await call.message.edit_text("Параметры:", reply_markup=main_menu(tax, fix, km))
     await call.answer()
 
 async def meas_fix_input(message: Message, state: FSMContext):
@@ -938,13 +933,12 @@ async def salary_stone_choice(call: CallbackQuery, state: FSMContext):
 async def salary_stone_back(call: CallbackQuery, state: FSMContext):
     # Возвращаемся в главное меню
     await state.clear()
-    unit = await get_unit(call.message.chat.id)
     tax  = await get_tax(call.message.chat.id)
     fix  = await get_measurement_fix(call.message.chat.id)
     km   = await get_measurement_km(call.message.chat.id)
     await call.message.edit_text(
         "Параметры:",
-        reply_markup=main_menu(unit, tax, fix, km)
+        reply_markup=main_menu(tax, fix, km)
     )
     await call.answer()
 
@@ -1166,13 +1160,12 @@ async def price_meter_input(message: Message, state: FSMContext):
 async def back_to_main(call: CallbackQuery, state: FSMContext):
     # Возвращаемся в главное меню
     await state.clear()
-    unit = await get_unit(call.message.chat.id)
     tax  = await get_tax(call.message.chat.id)
     fix  = await get_measurement_fix(call.message.chat.id)
     km   = await get_measurement_km(call.message.chat.id)
     await call.message.edit_text(
         "Привет! Настройте параметры:",
-        reply_markup=main_menu(unit, tax, fix, km)
+        reply_markup=main_menu(tax, fix, km)
     )
     await call.answer()
 
