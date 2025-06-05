@@ -484,7 +484,7 @@ def main_menu(tax_value: str, fix_value: str, km_value: str) -> InlineKeyboardMa
             text=f"Стоимость замеров | Фикс {fix_value} | КМ {km_value}",
             callback_data="set_measurement_cost"
         )],
-        [InlineKeyboardButton(text="Далее", callback_data="to_menu2")],
+        [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu2")],
     ])
 
 # ─── вставьте здесь подменю measurement ─────────────────────
@@ -568,7 +568,7 @@ def menu2_kb(stone: str, price: str,
         [InlineKeyboardButton(text=f"Такелаж | {tak}",              callback_data="menu2_takelage")],
 
         # далее оставшиеся кнопки:
-        [InlineKeyboardButton(text="Далее", callback_data="to_menu3")],
+        [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu3")],
         [InlineKeyboardButton(text="← Назад", callback_data="back_to_main")],
     ])
 
