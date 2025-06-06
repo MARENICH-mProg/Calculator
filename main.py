@@ -108,9 +108,25 @@ async def init_db():
             await db.execute("ALTER TABLE user_settings ADD COLUMN price_per_meter TEXT DEFAULT 'не указано'")
 
         # ─── меню 2: шесть полей для ручного ввода ─────────────────
-        for col in ("menu2_countertop", "menu2_wall", "menu2_boil", "menu2_sink", "menu2_glue", "menu2_edges"):
+        for col in (
+            "menu2_countertop", "menu2_wall", "menu2_boil",
+            "menu2_sink", "menu2_glue", "menu2_edges",
+        ):
             if col not in cols:
-                await db.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'")
+                await db.execute(
+                    f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'"
+                )
+
+        # дополнительные поля для хранения значений в м2 и м/п отдельно
+        for col in (
+            "menu2_countertop_m2", "menu2_countertop_mp",
+            "menu2_wall_m2", "menu2_wall_mp",
+            "menu2_edges_m2", "menu2_edges_mp",
+        ):
+            if col not in cols:
+                await db.execute(
+                    f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'"
+                )
 
         # *** ДОБАВЛЯЕМ новую колонку для Такелаж ***
         if "menu2_takelage" not in cols:
@@ -369,6 +385,27 @@ async def set_menu2_edges(chat_id: int, value: str):
             VALUES (?, ?)
             ON CONFLICT(chat_id) DO UPDATE SET menu2_edges = excluded.menu2_edges
         """, (chat_id, value))
+        await db.commit()
+
+# --- новые геттеры/сеттеры для значений в м2 и м/п ---
+async def get_menu2_value(chat_id: int, key: str, unit: str) -> str:
+    column = f"menu2_{key}_{'m2' if unit == 'м2' else 'mp'}"
+    async with connection() as db:
+        cur = await db.execute(f"SELECT {column} FROM user_settings WHERE chat_id = ?", (chat_id,))
+        row = await cur.fetchone()
+        return row[0] if row else "не указано"
+
+async def set_menu2_value(chat_id: int, key: str, unit: str, value: str):
+    column = f"menu2_{key}_{'m2' if unit == 'м2' else 'mp'}"
+    async with connection() as db:
+        await db.execute(
+            f"""
+            INSERT INTO user_settings(chat_id, {column})
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET {column} = excluded.{column}
+            """,
+            (chat_id, value),
+        )
         await db.commit()
 
 # … после get_menu2_edges и set_menu2_edges …
@@ -727,12 +764,12 @@ async def back_to_menu2(call: CallbackQuery, state: FSMContext):
     current_stone  = await get_general_stone_type(chat_id)
     current_price  = await get_price_per_meter(chat_id)
     unit           = await get_unit(chat_id)
-    cntp = await get_menu2_countertop(chat_id)
-    wal  = await get_menu2_wall(chat_id)
+    cntp = await get_menu2_value(chat_id, "countertop", unit)
+    wal  = await get_menu2_value(chat_id, "wall", unit)
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
-    ed   = await get_menu2_edges(chat_id)
+    ed   = await get_menu2_value(chat_id, "edges", unit)
     tak  = await get_menu2_takelage(chat_id)  # <<< читаем
 
     await call.message.edit_text(
@@ -1042,12 +1079,12 @@ async def to_menu2(call: CallbackQuery, state: FSMContext):
     current_stone  = await get_general_stone_type(chat_id)
     current_price  = await get_price_per_meter(chat_id)
     unit           = await get_unit(chat_id)
-    cntp           = await get_menu2_countertop(chat_id)
-    wal            = await get_menu2_wall(chat_id)
+    cntp           = await get_menu2_value(chat_id, "countertop", unit)
+    wal            = await get_menu2_value(chat_id, "wall", unit)
     bo             = await get_menu2_boil(chat_id)
     si             = await get_menu2_sink(chat_id)
     gl             = await get_menu2_glue(chat_id)
-    ed             = await get_menu2_edges(chat_id)
+    ed             = await get_menu2_value(chat_id, "edges", unit)
     tak            = await get_menu2_takelage(chat_id)   # <<< читаем новое поле
 
     await call.message.edit_text(
@@ -1084,12 +1121,12 @@ async def stone2_selected(call: CallbackQuery, state: FSMContext):
 
     current_price = await get_price_per_meter(chat_id)
     unit          = await get_unit(chat_id)
-    cntp = await get_menu2_countertop(chat_id)
-    wal  = await get_menu2_wall(chat_id)
+    cntp = await get_menu2_value(chat_id, "countertop", unit)
+    wal  = await get_menu2_value(chat_id, "wall", unit)
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
-    ed   = await get_menu2_edges(chat_id)
+    ed   = await get_menu2_value(chat_id, "edges", unit)
     tak  = await get_menu2_takelage(chat_id)  # <<< вот он
 
     await call.message.edit_text(
@@ -1135,12 +1172,12 @@ async def price_meter_input(message: Message, state: FSMContext):
     current_stone  = await get_general_stone_type(chat_id)
     current_price  = text
     unit           = await get_unit(chat_id)
-    cntp = await get_menu2_countertop(chat_id)
-    wal  = await get_menu2_wall(chat_id)
+    cntp = await get_menu2_value(chat_id, "countertop", unit)
+    wal  = await get_menu2_value(chat_id, "wall", unit)
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
-    ed   = await get_menu2_edges(chat_id)
+    ed   = await get_menu2_value(chat_id, "edges", unit)
     tak  = await get_menu2_takelage(chat_id)  # <<< читаем такелаж
 
     await message.bot.edit_message_text(
@@ -1174,16 +1211,20 @@ async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
     # Определяем, какая кнопка нажата: countertop, wall, boil, sink, glue или edges
     key = call.data  # «menu2_countertop» и т. д.
     await state.set_state(Settings.menu2_item)
-    await state.update_data(menu2_item_key=key, menu2_message_id=call.message.message_id)
-    # Формируем текст запроса и единицу
-    label, unit_type = {
-        "menu2_countertop":("Столешница", "м2"),
-        "menu2_wall":      ("Стеновая",   "м2"),
-        "menu2_boil":      ("Вырез варка", "шт"),
-        "menu2_sink":      ("Вырез мойка", "шт"),
-        "menu2_glue":      ("Подклейка",   "шт"),
-        "menu2_edges":     ("Бортики",     "м2"),
+    await state.update_data(
+        menu2_item_key=key,
+        menu2_message_id=call.message.message_id,
+        measure_type="m2",
+    )
+    label = {
+        "menu2_countertop": "Столешница",
+        "menu2_wall": "Стеновая",
+        "menu2_boil": "Вырез варка",
+        "menu2_sink": "Вырез мойка",
+        "menu2_glue": "Подклейка",
+        "menu2_edges": "Бортики",
     }[key]
+    unit_type = "м2" if key in {"menu2_countertop", "menu2_wall", "menu2_edges"} else "шт"
     msg = await call.message.answer(f"Введите значение для {label} ({unit_type}):")
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
@@ -1191,9 +1232,10 @@ async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
 # ─── 6.2) Обработка ввода текста для одной из шести строк ────
 async def menu2_item_input(message: Message, state: FSMContext):
     data = await state.get_data()
-    key = data["menu2_item_key"]          # «menu2_countertop» и т. д.
+    key = data["menu2_item_key"]
     menu2_id = data["menu2_message_id"]
     prompt_id = data.get("prompt_id")
+    measure_type = data.get("measure_type", "single")
     text = message.text.strip()
 
     # 1) Определяем, для какого ключа ввод:
@@ -1202,31 +1244,43 @@ async def menu2_item_input(message: Message, state: FSMContext):
     #    - Для остальных ("menu2_boil", "menu2_sink", "menu2_glue") → только целые (без запятой).
 
     if key in {"menu2_countertop", "menu2_wall", "menu2_edges"}:
-        # Проверяем, что введена дробь через запятую (ровно одна запятая, обе части — цифры).
+        # для м2 и м/п разрешаем дробные значения через запятую
         parts = text.split(",")
-        if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+        if len(parts) == 1:
+            valid = text.isdigit()
+        else:
+            valid = len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit()
+        if not valid:
             return await message.reply(
-                "Неверный формат. Для дробей используйте запятую, например: 2,3 или 5,0"
+                "Неверный формат. Для дробей используйте запятую, например: 2,3"
             )
-        # После этой проверки у нас гарантирован формат «X,Y», где X и Y — цифры/числа.
     else:
-        # Ключ — один из {"menu2_boil","menu2_sink","menu2_glue"} → только целые
         if not text.isdigit():
             return await message.reply("Неверный формат. Введите целое число, например: 5")
 
     # 2) Заменяем запятую на точку перед сохранением (чтобы в БД хранилось "2.3" вместо "2,3")
     to_store = text.replace(",", ".")
 
-    # 3) Выбираем нужную функцию-сеттер и сохраняем в БД
-    setter = {
-        "menu2_countertop": set_menu2_countertop,
-        "menu2_wall":       set_menu2_wall,
-        "menu2_boil":       set_menu2_boil,
-        "menu2_sink":       set_menu2_sink,
-        "menu2_glue":       set_menu2_glue,
-        "menu2_edges":      set_menu2_edges,
-    }[key]
-    await setter(message.chat.id, to_store)
+    if key in {"menu2_countertop", "menu2_wall", "menu2_edges"}:
+        field = key.split("_")[1]  # countertop / wall / edges
+        await set_menu2_value(message.chat.id, field, "м2" if measure_type == "m2" else "м/п", to_store)
+        # если это был ввод м2, запрашиваем м/п
+        if measure_type == "m2":
+            label = {"countertop": "Столешница", "wall": "Стеновая", "edges": "Бортики"}[field]
+            msg = await message.answer(f"Введите значение для {label} (м/п):")
+            await state.update_data(measure_type="mp", prompt_id=msg.message_id)
+            await message.delete()
+            if prompt_id:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
+            return
+    else:
+        # boil / sink / glue
+        setter = {
+            "menu2_boil": set_menu2_boil,
+            "menu2_sink": set_menu2_sink,
+            "menu2_glue": set_menu2_glue,
+        }[key]
+        await setter(message.chat.id, to_store)
 
     # 4) Удаляем сообщение пользователя и подсказку
     await message.delete()
@@ -1238,12 +1292,12 @@ async def menu2_item_input(message: Message, state: FSMContext):
     current_stone = await get_general_stone_type(message.chat.id)
     current_price = await get_price_per_meter(message.chat.id)
     unit = await get_unit(message.chat.id)
-    cntp = await get_menu2_countertop(message.chat.id)
-    wal  = await get_menu2_wall(message.chat.id)
+    cntp = await get_menu2_value(message.chat.id, "countertop", unit)
+    wal  = await get_menu2_value(message.chat.id, "wall", unit)
     bo   = await get_menu2_boil(message.chat.id)
     si   = await get_menu2_sink(message.chat.id)
     gl   = await get_menu2_glue(message.chat.id)
-    ed   = await get_menu2_edges(message.chat.id)
+    ed   = await get_menu2_value(message.chat.id, "edges", unit)
     tak = await get_menu2_takelage(message.chat.id)
 
     await message.bot.edit_message_text(
@@ -1274,12 +1328,12 @@ async def menu2_takelage_input(call: CallbackQuery, state: FSMContext):
     current_stone  = await get_general_stone_type(chat_id)
     current_price  = await get_price_per_meter(chat_id)
     unit           = await get_unit(chat_id)
-    cntp = await get_menu2_countertop(chat_id)
-    wal  = await get_menu2_wall(chat_id)
+    cntp = await get_menu2_value(chat_id, "countertop", unit)
+    wal  = await get_menu2_value(chat_id, "wall", unit)
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
-    ed   = await get_menu2_edges(chat_id)
+    ed   = await get_menu2_value(chat_id, "edges", unit)
     tak  = choice  # «да» или «нет»
 
     # Удаляем сообщение с кнопками
@@ -1312,8 +1366,8 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
 
     # ─── 1) Расчёт стоимости материала ────────────────────────────
     price_str = await get_price_per_meter(chat_id)       # строка, например "5000" или "не указано"
-    cntp_str  = await get_menu2_countertop(chat_id)      # строка, например "2.30" или "не указано"
-    wall_str  = await get_menu2_wall(chat_id)            # строка, например "1.50" или "не указано"
+    cntp_str  = await get_menu2_value(chat_id, "countertop", unit)
+    wall_str  = await get_menu2_value(chat_id, "wall", unit)
 
     def to_float(x: str) -> float:
         return float(x.replace(",", ".")) if x not in ("не указано", "") else 0.0
@@ -1368,12 +1422,12 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     price_edges = to_float_zero(raw_price_edges)
 
     # 2.3) Пользовательские величины из меню 2
-    raw_val_ctp   = await get_menu2_countertop(chat_id)  # "2.30" или "не указано"
-    raw_val_wall  = await get_menu2_wall(chat_id)
+    raw_val_ctp   = await get_menu2_value(chat_id, "countertop", master_unit)
+    raw_val_wall  = await get_menu2_value(chat_id, "wall", master_unit)
     raw_val_boil  = await get_menu2_boil(chat_id)
     raw_val_sink  = await get_menu2_sink(chat_id)
     raw_val_glue  = await get_menu2_glue(chat_id)
-    raw_val_edges = await get_menu2_edges(chat_id)
+    raw_val_edges = await get_menu2_value(chat_id, "edges", master_unit)
 
     def parse_area(v: str) -> float:
         return float(v) if v.replace(".", "", 1).isdigit() else 0.0
@@ -1457,11 +1511,16 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     meas_km = to_float_zero(raw_meas_km)
     km_qty = int(raw_km_qty) if raw_km_qty.isdigit() else 0
 
-    # Количества/площади те же, что для мастера:
-    # val_ctp, val_wall (float), val_boil, val_sink, val_glue, val_edges
-    # Но монтажнику нужны только столешница и стеновая (для него “boil/sink/glue/edges” не в счёт).
-    cost_inst_ctp = price_inst_ctp * val_ctp
-    cost_inst_wall = price_inst_wall * val_wall
+    # Пользовательские количества в единицах монтажника
+    raw_inst_val_ctp = await get_menu2_value(chat_id, "countertop", installer_unit)
+    raw_inst_val_wall = await get_menu2_value(chat_id, "wall", installer_unit)
+
+    inst_val_ctp = parse_area(raw_inst_val_ctp)
+    inst_val_wall = parse_area(raw_inst_val_wall)
+
+    # Монтажнику нужны только столешница и стеновая
+    cost_inst_ctp = price_inst_ctp * inst_val_ctp
+    cost_inst_wall = price_inst_wall * inst_val_wall
 
     # Доставка: фиксированная сумма + стоимость километров
     cost_inst_delivery_km = meas_km * km_qty
@@ -1472,8 +1531,8 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     takelage_cost = 0.0
     if raw_takel_flag == "да":
         # если пользователь выбрал «да», тогда считаем:
-        # (площадь столешницы + площадь стеновой) × цена монтажника за takelage
-        takelage_cost = price_inst_takel * (val_ctp + val_wall)
+        # (сумма длин/площадей в единицах монтажника) × цена за такелаж
+        takelage_cost = price_inst_takel * (inst_val_ctp + inst_val_wall)
 
     total_inst = cost_inst_ctp + cost_inst_wall + cost_inst_delivery + takelage_cost
 
@@ -1481,12 +1540,12 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
         "\n📋 Расчёт ЗП монтажника (тип камня: " + stone_text + "):\n",
         f"• Столешница:\n"
         f"    цена монтажника за {installer_unit} = {fmt_price(price_inst_ctp)} ₽, "
-        f"площадь = {disp(raw_val_ctp)} {installer_unit} → "
-        f"{fmt_price(price_inst_ctp)} × {disp(raw_val_ctp)} = {fmt_cost(cost_inst_ctp)} ₽\n",
+        f"площадь = {disp(raw_inst_val_ctp)} {installer_unit} → "
+        f"{fmt_price(price_inst_ctp)} × {disp(raw_inst_val_ctp)} = {fmt_cost(cost_inst_ctp)} ₽\n",
         f"• Стеновая:\n"
         f"    цена монтажника за {installer_unit} = {fmt_price(price_inst_wall)} ₽, "
-        f"площадь = {disp(raw_val_wall)} {installer_unit} → "
-        f"{fmt_price(price_inst_wall)} × {disp(raw_val_wall)} = {fmt_cost(cost_inst_wall)} ₽\n",
+        f"площадь = {disp(raw_inst_val_wall)} {installer_unit} → "
+        f"{fmt_price(price_inst_wall)} × {disp(raw_inst_val_wall)} = {fmt_cost(cost_inst_wall)} ₽\n",
         f"• Доставка:\n"
         f"    фиксированная сумма = {fmt_price(price_inst_deliv)} ₽\n",
         f"    {km_qty} км × {fmt_price(meas_km)} ₽/км = {fmt_cost(cost_inst_delivery_km)} ₽\n",
@@ -1496,8 +1555,8 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
         inst_log += [
             f"• Такелаж:\n"
             f"    цена монтажника за {installer_unit} = {fmt_price(price_inst_takel)} ₽, "
-            f"суммарная длина = {disp(raw_val_ctp)} + {disp(raw_val_wall)} = {fmt_num(val_ctp + val_wall)} {installer_unit} → "
-            f"{fmt_price(price_inst_takel)} × {fmt_num(val_ctp + val_wall)} = {fmt_cost(takelage_cost)} ₽\n"
+            f"суммарная длина = {disp(raw_inst_val_ctp)} + {disp(raw_inst_val_wall)} = {fmt_num(inst_val_ctp + inst_val_wall)} {installer_unit} → "
+            f"{fmt_price(price_inst_takel)} × {fmt_num(inst_val_ctp + inst_val_wall)} = {fmt_cost(takelage_cost)} ₽\n"
         ]
     else:
         inst_log += [f"• Такелаж: нет → 0 ₽\n"]
