@@ -91,9 +91,9 @@ async def init_db():
         ]
         installer_cols = [
             "installer_acryl_countertop", "installer_acryl_wall",
-            "installer_acryl_delivery", "installer_acryl_takelage",
+            "installer_acryl_delivery", "installer_acryl_delivery_km", "installer_acryl_takelage",
             "installer_quartz_countertop", "installer_quartz_wall",
-            "installer_quartz_delivery", "installer_quartz_takelage",
+            "installer_quartz_delivery", "installer_quartz_delivery_km", "installer_quartz_takelage",
         ]
         for col in master_cols:
             if col not in cols:
@@ -512,7 +512,7 @@ async def set_measurement_km(chat_id: int, value: str):
 # ─── после этой строки идут функции main_menu и далее ────────
 
 # ─── 4) Построение главного меню ─────────────────────────────
-def main_menu(tax_value: str, fix_value: str, km_value: str) -> InlineKeyboardMarkup:
+def main_menu(tax_value: str, fix_value: str, km_value: str, mop_value: str, margin_value: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="ЗП Мастера", callback_data="salary_master")],
         [InlineKeyboardButton(text="ЗП Монтажника", callback_data="salary_installer")],
@@ -521,6 +521,8 @@ def main_menu(tax_value: str, fix_value: str, km_value: str) -> InlineKeyboardMa
             text=f"Стоимость замеров | Фикс {fix_value} | КМ {km_value}",
             callback_data="set_measurement_cost"
         )],
+        [InlineKeyboardButton(text=f"МОП | {mop_value}%", callback_data="set_mop")],
+        [InlineKeyboardButton(text=f"Маржа | {margin_value}%", callback_data="set_margin")],
         [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu2")],
     ])
 
@@ -529,7 +531,7 @@ def meas_submenu(fix: str, km: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text=f"Фикс | {fix}",        callback_data="meas_fix"),
-            InlineKeyboardButton(text=f"Стоимость КМ | {km}", callback_data="meas_km"),
+            InlineKeyboardButton(text=f"Стоимость КМ | {km}", callback_data="price_inst_deliv_km"),
         ],
         [InlineKeyboardButton(text="← Назад", callback_data="meas_back")],
     ])
@@ -564,7 +566,7 @@ def salary_item_kb(role: str, stone: str, unit: str, values: dict[str,str]) -> I
         ],[
             InlineKeyboardButton(text=f"Стеновая | {values['wall']} | {unit}",       callback_data=f"salary_{role}_{stone}_wall")
         ],[
-            InlineKeyboardButton(text=f"Доставка | {values['delivery']}",            callback_data=f"salary_{role}_{stone}_delivery"),
+            InlineKeyboardButton(text=f"Доставка | фикс {values['delivery_fix']} | км {values['delivery_km']}", callback_data=f"salary_{role}_{stone}_delivery"),
             InlineKeyboardButton(text=f"Такелаж | {values['takelage']} | {unit}",     callback_data=f"salary_{role}_{stone}_takelage")
         ]]
     kb.append([InlineKeyboardButton(text=f"Ед. измерения | {unit}", callback_data=f"salary_{role}_{stone}_unit")])
@@ -638,8 +640,13 @@ async def start_handler(message: Message, state: FSMContext):
 
     tax  = await get_tax(message.chat.id)
     fix = await get_measurement_fix(message.chat.id)
-    km = await get_measurement_km(message.chat.id)
-    await message.answer("Привет! Настройте параметры:", reply_markup=main_menu(tax, fix, km))
+    km  = await get_measurement_km(message.chat.id)
+    mop = await get_menu3_mop(message.chat.id)
+    margin = await get_menu3_margin(message.chat.id)
+    await message.answer(
+        "Привет! Настройте параметры:",
+        reply_markup=main_menu(tax, fix, km, mop, margin),
+    )
 
 # ─── Хендлеры меню 3 ─────────────────────────────────────────
 
@@ -669,7 +676,8 @@ async def menu3_km_menu(call: CallbackQuery, state: FSMContext):
 
 async def menu3_km_input(message: Message, state: FSMContext):
     data       = await state.get_data()
-    menu3_id   = data["menu3_message_id"]
+    menu3_id   = data.get("menu3_message_id")
+    menu_id    = data.get("menu_message_id")
     prompt_id  = data.get("prompt_id")
     text       = message.text.strip()
     if not text.isdigit():
@@ -679,16 +687,30 @@ async def menu3_km_input(message: Message, state: FSMContext):
     if prompt_id:
         await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
 
-    await state.set_state(Settings.menu3)
-    km_current     = await get_menu3_km(message.chat.id)
-    mop_current    = await get_menu3_mop(message.chat.id)
-    margin_current = await get_menu3_margin(message.chat.id)
-    await message.bot.edit_message_text(
-        text="Основное меню 3:",
-        chat_id=message.chat.id,
-        message_id=menu3_id,
-        reply_markup=menu3_kb(km_current, mop_current, margin_current)
-    )
+    if menu3_id:
+        await state.set_state(Settings.menu3)
+        km_current     = await get_menu3_km(message.chat.id)
+        mop_current    = await get_menu3_mop(message.chat.id)
+        margin_current = await get_menu3_margin(message.chat.id)
+        await message.bot.edit_message_text(
+            text="Основное меню 3:",
+            chat_id=message.chat.id,
+            message_id=menu3_id,
+            reply_markup=menu3_kb(km_current, mop_current, margin_current)
+        )
+    else:
+        await state.clear()
+        tax  = await get_tax(message.chat.id)
+        fix  = await get_measurement_fix(message.chat.id)
+        km   = await get_measurement_km(message.chat.id)
+        mop  = await get_menu3_mop(message.chat.id)
+        margin = await get_menu3_margin(message.chat.id)
+        await message.bot.edit_message_text(
+            text="Параметры:",
+            chat_id=message.chat.id,
+            message_id=menu_id,
+            reply_markup=main_menu(tax, fix, km, mop, margin)
+        )
 
 
 async def menu3_mop_menu(call: CallbackQuery, state: FSMContext):
@@ -701,7 +723,8 @@ async def menu3_mop_menu(call: CallbackQuery, state: FSMContext):
 
 async def menu3_mop_input(message: Message, state: FSMContext):
     data       = await state.get_data()
-    menu3_id   = data["menu3_message_id"]
+    menu3_id   = data.get("menu3_message_id")
+    menu_id    = data.get("menu_message_id")
     prompt_id  = data.get("prompt_id")
     text       = message.text.strip()
     if not text.isdigit() or not (0 <= int(text) <= 100):
@@ -711,16 +734,30 @@ async def menu3_mop_input(message: Message, state: FSMContext):
     if prompt_id:
         await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
 
-    await state.set_state(Settings.menu3)
-    km_current     = await get_menu3_km(message.chat.id)
-    mop_current    = await get_menu3_mop(message.chat.id)
-    margin_current = await get_menu3_margin(message.chat.id)
-    await message.bot.edit_message_text(
-        text="Основное меню 3:",
-        chat_id=message.chat.id,
-        message_id=menu3_id,
-        reply_markup=menu3_kb(km_current, mop_current, margin_current)
-    )
+    if menu3_id:
+        await state.set_state(Settings.menu3)
+        km_current     = await get_menu3_km(message.chat.id)
+        mop_current    = await get_menu3_mop(message.chat.id)
+        margin_current = await get_menu3_margin(message.chat.id)
+        await message.bot.edit_message_text(
+            text="Основное меню 3:",
+            chat_id=message.chat.id,
+            message_id=menu3_id,
+            reply_markup=menu3_kb(km_current, mop_current, margin_current)
+        )
+    else:
+        await state.clear()
+        tax  = await get_tax(message.chat.id)
+        fix  = await get_measurement_fix(message.chat.id)
+        km   = await get_measurement_km(message.chat.id)
+        mop  = await get_menu3_mop(message.chat.id)
+        margin = await get_menu3_margin(message.chat.id)
+        await message.bot.edit_message_text(
+            text="Параметры:",
+            chat_id=message.chat.id,
+            message_id=menu_id,
+            reply_markup=main_menu(tax, fix, km, mop, margin)
+        )
 
 
 async def menu3_margin_menu(call: CallbackQuery, state: FSMContext):
@@ -808,12 +845,14 @@ async def unit_choice(call: CallbackQuery, state: FSMContext):
     # Снова получаем обе настройки и редактируем то же сообщение
     tax  = await get_tax(call.message.chat.id)
     fix = await get_measurement_fix(call.message.chat.id)
-    km = await get_measurement_km(call.message.chat.id)
+    km  = await get_measurement_km(call.message.chat.id)
+    mop = await get_menu3_mop(call.message.chat.id)
+    margin = await get_menu3_margin(call.message.chat.id)
     await call.message.bot.edit_message_text(
         text="Параметры:",
         chat_id=call.message.chat.id,
         message_id=menu_id,
-        reply_markup=main_menu(tax, fix, km)
+        reply_markup=main_menu(tax, fix, km, mop, margin)
     )
     await call.answer()
 
@@ -852,12 +891,14 @@ async def tax_input(message: Message, state: FSMContext):
     # 4) Редактируем то же сообщение-меню
     tax  = await get_tax(message.chat.id)
     fix = await get_measurement_fix(message.chat.id)
-    km = await get_measurement_km(message.chat.id)
+    km  = await get_measurement_km(message.chat.id)
+    mop = await get_menu3_mop(message.chat.id)
+    margin = await get_menu3_margin(message.chat.id)
     await message.bot.edit_message_text(
         text="Параметры:",
         chat_id=message.chat.id,
         message_id=menu_id,
-        reply_markup=main_menu(tax, fix, km)
+        reply_markup=main_menu(tax, fix, km, mop, margin)
     )
 
 # ─── вставьте сюда хендлеры для measurement ────────────────
@@ -877,7 +918,7 @@ async def meas_fix_menu(call: CallbackQuery, state: FSMContext):
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
-async def meas_km_menu(call: CallbackQuery, state: FSMContext):
+async def price_inst_deliv_km_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.meas_km)
     data = await state.get_data()
     await state.update_data(menu_message_id=data["menu_message_id"])
@@ -890,7 +931,9 @@ async def meas_back(call: CallbackQuery, state: FSMContext):
     tax  = await get_tax(call.message.chat.id)
     fix  = await get_measurement_fix(call.message.chat.id)
     km   = await get_measurement_km(call.message.chat.id)
-    await call.message.edit_text("Параметры:", reply_markup=main_menu(tax, fix, km))
+    mop  = await get_menu3_mop(call.message.chat.id)
+    margin = await get_menu3_margin(call.message.chat.id)
+    await call.message.edit_text("Параметры:", reply_markup=main_menu(tax, fix, km, mop, margin))
     await call.answer()
 
 async def meas_fix_input(message: Message, state: FSMContext):
@@ -914,7 +957,7 @@ async def meas_fix_input(message: Message, state: FSMContext):
         reply_markup=meas_submenu(fix, km)
     )
 
-async def meas_km_input(message: Message, state: FSMContext):
+async def price_inst_deliv_km_input(message: Message, state: FSMContext):
     data    = await state.get_data()
     menu_id = data["menu_message_id"]
     prompt_id = data.get("prompt_id")
@@ -934,6 +977,20 @@ async def meas_km_input(message: Message, state: FSMContext):
         message_id=menu_id,
         reply_markup=meas_submenu(fix, km)
     )
+
+async def set_mop_main(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Settings.menu3_mop)
+    await state.update_data(menu_message_id=call.message.message_id)
+    msg = await call.message.answer("Введите проценты МОПу (целое число от 0 до 100):")
+    await state.update_data(prompt_id=msg.message_id)
+    await call.answer()
+
+async def set_margin_main(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Settings.menu3_margin)
+    await state.update_data(menu_message_id=call.message.message_id)
+    msg = await call.message.answer("Введите маржу в % (целое число от 0 до 100):")
+    await state.update_data(prompt_id=msg.message_id)
+    await call.answer()
 
 async def salary_role_menu(call: CallbackQuery, state: FSMContext):
     # call.data == "salary_master" или "salary_installer"
@@ -958,7 +1015,7 @@ async def salary_stone_choice(call: CallbackQuery, state: FSMContext):
     if role=="master":
         keys += ["boil","sink","glue","edges"]
     else:
-        keys += ["delivery","takelage"]
+        keys += ["delivery_fix","delivery_km","takelage"]
     values = {k: await get_salary(call.message.chat.id, f"master_{stone}_{k}" if role=="master" else f"installer_{stone}_{k}")
               for k in keys}
     await call.message.edit_text(
@@ -973,9 +1030,11 @@ async def salary_stone_back(call: CallbackQuery, state: FSMContext):
     tax  = await get_tax(call.message.chat.id)
     fix  = await get_measurement_fix(call.message.chat.id)
     km   = await get_measurement_km(call.message.chat.id)
+    mop  = await get_menu3_mop(call.message.chat.id)
+    margin = await get_menu3_margin(call.message.chat.id)
     await call.message.edit_text(
         "Параметры:",
-        reply_markup=main_menu(tax, fix, km)
+        reply_markup=main_menu(tax, fix, km, mop, margin)
     )
     await call.answer()
 
@@ -992,10 +1051,14 @@ async def salary_item_menu(call: CallbackQuery, state: FSMContext):
       "glue":"Подклейка","edges":"Бортики",
       "delivery":"Доставка","takelage":"Такелаж",
     }[item]
-    msg = await call.message.answer(
-        f"Введите сумму для {label} ({'м2' if item in ['countertop','wall','edges','takelage'] else 'шт.'}):"
-    )
-    await state.update_data(prompt_id=msg.message_id)
+    if item == "delivery":
+        msg = await call.message.answer("Введите фиксированную стоимость доставки (₽):")
+        await state.update_data(prompt_id=msg.message_id, substep="fix")
+    else:
+        msg = await call.message.answer(
+            f"Введите сумму для {label} ({'м2' if item in ['countertop','wall','edges','takelage'] else 'шт.'}):"
+        )
+        await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def salary_item_input(message: Message, state: FSMContext):
@@ -1006,11 +1069,25 @@ async def salary_item_input(message: Message, state: FSMContext):
     text   = message.text.strip()
     if not text.isdigit():
         return await message.reply("Введите число, например: 1500")
-    await set_salary(
-        message.chat.id,
-        f"{role}_{stone}_{item}",
-        text
-    )
+
+    if item == "delivery":
+        step = data.get("substep", "fix")
+        if step == "fix":
+            await set_salary(message.chat.id, f"{role}_{stone}_delivery", text)
+            msg = await message.answer("Введите стоимость за километр (₽):")
+            await state.update_data(substep="km", prompt_id=msg.message_id)
+            await message.delete()
+            if prompt_id:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
+            return
+        else:
+            await set_salary(message.chat.id, f"{role}_{stone}_delivery_km", text)
+    else:
+        await set_salary(
+            message.chat.id,
+            f"{role}_{stone}_{item}",
+            text
+        )
     await message.delete()
     if prompt_id:
         await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
@@ -1021,7 +1098,7 @@ async def salary_item_input(message: Message, state: FSMContext):
     else:
         unit = await get_installer_unit(message.chat.id)
     # заново собрать values как в B)
-    keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery","takelage"])
+    keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery_fix","delivery_km","takelage"])
     values = {k: await get_salary(message.chat.id, f"{role}_{stone}_{k}") for k in keys}
     await message.bot.edit_message_text(
         text=f"Установки для { 'акрилового' if stone=='acryl' else 'кварцевого' } камня:",
@@ -1057,7 +1134,7 @@ async def salary_unit_choice(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     menu_id = data["menu_message_id"]
     # восстановим значения
-    keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery","takelage"])
+    keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery_fix","delivery_km","takelage"])
     values = {k: await get_salary(chat_id, f"{role}_{stone}_{k}") for k in keys}
     unit = choice
     await call.message.bot.edit_message_text(
@@ -1200,9 +1277,11 @@ async def back_to_main(call: CallbackQuery, state: FSMContext):
     tax  = await get_tax(call.message.chat.id)
     fix  = await get_measurement_fix(call.message.chat.id)
     km   = await get_measurement_km(call.message.chat.id)
+    mop  = await get_menu3_mop(call.message.chat.id)
+    margin = await get_menu3_margin(call.message.chat.id)
     await call.message.edit_text(
         "Привет! Настройте параметры:",
-        reply_markup=main_menu(tax, fix, km)
+        reply_markup=main_menu(tax, fix, km, mop, margin)
     )
     await call.answer()
 
@@ -1500,16 +1579,15 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     raw_inst_ctp = await get_salary(chat_id, f"installer_{stone_key}_countertop")
     raw_inst_wall = await get_salary(chat_id, f"installer_{stone_key}_wall")
     raw_inst_deliv = await get_salary(chat_id, f"installer_{stone_key}_delivery")
+    raw_inst_deliv_km = await get_salary(chat_id, f"installer_{stone_key}_delivery_km")
     raw_inst_takel = await get_salary(chat_id, f"installer_{stone_key}_takelage")
-    # стоимость доставки за километры берём из настроек замеров
-    raw_meas_km = await get_measurement_km(chat_id)
     raw_km_qty = await get_menu3_km(chat_id)
 
     price_inst_ctp = to_float_zero(raw_inst_ctp)
     price_inst_wall = to_float_zero(raw_inst_wall)
     price_inst_deliv = to_float_zero(raw_inst_deliv)
+    price_inst_deliv_km = to_float_zero(raw_inst_deliv_km)
     price_inst_takel = to_float_zero(raw_inst_takel)
-    meas_km = to_float_zero(raw_meas_km)
     km_qty = int(raw_km_qty) if raw_km_qty.isdigit() else 0
 
     # Пользовательские количества в единицах монтажника
@@ -1524,7 +1602,7 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     cost_inst_wall = price_inst_wall * inst_val_wall
 
     # Доставка: фиксированная сумма + стоимость километров
-    cost_inst_delivery_km = meas_km * km_qty
+    cost_inst_delivery_km = price_inst_deliv_km * km_qty
     cost_inst_delivery = price_inst_deliv + cost_inst_delivery_km
 
     # Такелаж: смотрим флаг из БД (menu2_takelage: "да"/"нет")
@@ -1549,7 +1627,7 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
         f"{fmt_price(price_inst_wall)} × {disp(raw_inst_val_wall)} = {fmt_cost(cost_inst_wall)} ₽\n",
         f"• Доставка:\n"
         f"    фиксированная сумма = {fmt_price(price_inst_deliv)} ₽\n",
-        f"    {km_qty} км × {fmt_price(meas_km)} ₽/км = {fmt_cost(cost_inst_delivery_km)} ₽\n",
+        f"    {km_qty} км × {fmt_price(price_inst_deliv_km)} ₽/км = {fmt_cost(cost_inst_delivery_km)} ₽\n",
     ]
 
     if raw_takel_flag == "да":
@@ -1569,8 +1647,10 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
 
     # ─── 4) Расчёт стоимости замеров ────────────────────────────────
     raw_meas_fix = await get_measurement_fix(chat_id)  # строка, напр. "3000" или "не указано"
+    raw_meas_km  = await get_measurement_km(chat_id)
 
     meas_fix = to_float_zero(raw_meas_fix)
+    meas_km  = to_float_zero(raw_meas_km)
 
     cost_meas_km = meas_km * km_qty
     total_meas = meas_fix + cost_meas_km
@@ -1676,10 +1756,12 @@ async def main():
     # ─── вставьте регистрацию measurement ─────────────
     dp.callback_query.register(set_measurement_menu, lambda c: c.data == "set_measurement_cost")
     dp.callback_query.register(meas_fix_menu, lambda c: c.data == "meas_fix")
-    dp.callback_query.register(meas_km_menu, lambda c: c.data == "meas_km")
+    dp.callback_query.register(price_inst_deliv_km_menu, lambda c: c.data == "meas_km")
     dp.callback_query.register(meas_back, lambda c: c.data == "meas_back")
     dp.message.register(meas_fix_input, Settings.meas_fix)
-    dp.message.register(meas_km_input, Settings.meas_km)
+    dp.message.register(price_inst_deliv_km_input, Settings.meas_km)
+    dp.callback_query.register(set_mop_main, lambda c: c.data == "set_mop")
+    dp.callback_query.register(set_margin_main, lambda c: c.data == "set_margin")
     # dp.callback_query.register(set_master_menu, lambda c: c.data == "set_master_salary")
     # dp.callback_query.register(master_type_choice, lambda c: c.data in ("master_acryl", "master_quartz"))
     # dp.callback_query.register(master_type_back, lambda c: c.data == "master_back")
