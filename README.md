@@ -30,7 +30,9 @@ python main.py
 - "Единица измерения" — choose units (m² or linear meters).
 - "Система налогов" — input your tax percentage.
 - "Стоимость замеров" — configure fixed price and per‑kilometer price for measurements.
-- "ЗП Мастера" / "ЗП Монтажника" — set wages for each role.
+- "МОП" — set overhead percentage.
+- "Маржа" — set profit margin.
+- "ЗП Мастера" / "ЗП Монтажника" — set wages for each role. Installer delivery now has fixed and per‑kilometer components, editable from this menu.
 - "Далее" opens extra menus to provide dimensions, material prices and other values.
 - "Рассчитать" — receive a detailed breakdown of material cost and salaries.
 
