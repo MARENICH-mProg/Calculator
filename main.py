@@ -37,6 +37,7 @@ class Settings(StatesGroup):
     countertop_input = State()  # ввод значения для конкретной единицы
     wall_menu = State()  # подменю стеновой с выбором м2/м/п
     wall_input = State()  # ввод значения стеновой для выбранной единицы
+
     menu2_takelage = State()  # *** новое состояние для выбора «такелаж» ***
     # ─── добавляем подменю 3 ────────────────────────────────
     menu3 = State()  # сам экран «меню 3»
@@ -613,7 +614,9 @@ def menu2_kb(stone: str, price: str,
         [InlineKeyboardButton(text=f"Тип камня | {stone}",        callback_data="set_first_stone")],
         [InlineKeyboardButton(text=f"Цена за камень | {price}",   callback_data="set_stone_price")],
         [InlineKeyboardButton(text=f"Столешница | {cntp}", callback_data="menu2_countertop")],
+
         [InlineKeyboardButton(text=f"Стеновая | {wal}",   callback_data="menu2_wall")],
+
         [
           InlineKeyboardButton(text=f"Вырез варка | {bo} шт",      callback_data="menu2_boil"),
           InlineKeyboardButton(text=f"Вырез мойка | {si} шт",      callback_data="menu2_sink"),
@@ -840,9 +843,11 @@ async def back_to_menu2(call: CallbackQuery, state: FSMContext):
     cntp_m2 = await get_menu2_value(chat_id, "countertop", "м2")
     cntp_mp = await get_menu2_value(chat_id, "countertop", "м/п")
     cntp = f"{cntp_m2} м2 | {cntp_mp} п/м"
+
     wal_m2 = await get_menu2_value(chat_id, "wall", "м2")
     wal_mp = await get_menu2_value(chat_id, "wall", "м/п")
     wal = f"{wal_m2} м2 | {wal_mp} п/м"
+
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
@@ -1202,9 +1207,11 @@ async def to_menu2(call: CallbackQuery, state: FSMContext):
     cntp_m2        = await get_menu2_value(chat_id, "countertop", "м2")
     cntp_mp        = await get_menu2_value(chat_id, "countertop", "м/п")
     cntp           = f"{cntp_m2} м2 | {cntp_mp} п/м"
+
     wal_m2         = await get_menu2_value(chat_id, "wall", "м2")
     wal_mp         = await get_menu2_value(chat_id, "wall", "м/п")
     wal            = f"{wal_m2} м2 | {wal_mp} п/м"
+
     bo             = await get_menu2_boil(chat_id)
     si             = await get_menu2_sink(chat_id)
     gl             = await get_menu2_glue(chat_id)
@@ -1248,9 +1255,11 @@ async def stone2_selected(call: CallbackQuery, state: FSMContext):
     cntp_m2 = await get_menu2_value(chat_id, "countertop", "м2")
     cntp_mp = await get_menu2_value(chat_id, "countertop", "м/п")
     cntp = f"{cntp_m2} м2 | {cntp_mp} п/м"
+
     wal_m2 = await get_menu2_value(chat_id, "wall", "м2")
     wal_mp = await get_menu2_value(chat_id, "wall", "м/п")
     wal = f"{wal_m2} м2 | {wal_mp} п/м"
+
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
@@ -1303,9 +1312,11 @@ async def stone_price_input(message: Message, state: FSMContext):
     cntp_m2 = await get_menu2_value(chat_id, "countertop", "м2")
     cntp_mp = await get_menu2_value(chat_id, "countertop", "м/п")
     cntp = f"{cntp_m2} м2 | {cntp_mp} п/м"
+
     wal_m2 = await get_menu2_value(chat_id, "wall", "м2")
     wal_mp = await get_menu2_value(chat_id, "wall", "м/п")
     wal = f"{wal_m2} м2 | {wal_mp} п/м"
+
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
@@ -1369,6 +1380,7 @@ async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
         )
         await call.answer()
         return
+
     if key == "menu2_wall":
         await state.set_state(Settings.wall_menu)
         chat_id = call.message.chat.id
@@ -1381,6 +1393,7 @@ async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
         await call.answer()
         return
     if key == "menu2_edges":
+
         await state.set_state(Settings.menu2_item_unit)
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [
@@ -1463,6 +1476,7 @@ async def countertop_value_input(message: Message, state: FSMContext):
     await state.set_state(Settings.countertop_menu)
 
 
+
 async def wall_unit_menu(call: CallbackQuery, state: FSMContext):
     unit = "м2" if call.data == "wall_m2" else "м/п"
     await state.set_state(Settings.wall_input)
@@ -1506,6 +1520,7 @@ async def wall_value_input(message: Message, state: FSMContext):
     await state.set_state(Settings.wall_menu)
 
 
+
 async def countertop_back(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.menu2)
     data = await state.get_data()
@@ -1518,6 +1533,7 @@ async def countertop_back(call: CallbackQuery, state: FSMContext):
     cntp_m2 = await get_menu2_value(chat_id, "countertop", "м2")
     cntp_mp = await get_menu2_value(chat_id, "countertop", "м/п")
     cntp = f"{cntp_m2} м2 | {cntp_mp} п/м"
+
     wal_m2 = await get_menu2_value(chat_id, "wall", "м2")
     wal_mp = await get_menu2_value(chat_id, "wall", "м/п")
     wal = f"{wal_m2} м2 | {wal_mp} п/м"
@@ -1554,6 +1570,7 @@ async def wall_back(call: CallbackQuery, state: FSMContext):
     wal_m2 = await get_menu2_value(chat_id, "wall", "м2")
     wal_mp = await get_menu2_value(chat_id, "wall", "м/п")
     wal = f"{wal_m2} м2 | {wal_mp} п/м"
+
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
@@ -1633,9 +1650,11 @@ async def menu2_item_input(message: Message, state: FSMContext):
     cntp_m2 = await get_menu2_value(message.chat.id, "countertop", "м2")
     cntp_mp = await get_menu2_value(message.chat.id, "countertop", "м/п")
     cntp = f"{cntp_m2} м2 | {cntp_mp} п/м"
+
     wal_m2 = await get_menu2_value(message.chat.id, "wall", "м2")
     wal_mp = await get_menu2_value(message.chat.id, "wall", "м/п")
     wal  = f"{wal_m2} м2 | {wal_mp} п/м"
+
     bo   = await get_menu2_boil(message.chat.id)
     si   = await get_menu2_sink(message.chat.id)
     gl   = await get_menu2_glue(message.chat.id)
@@ -1673,9 +1692,11 @@ async def menu2_takelage_input(call: CallbackQuery, state: FSMContext):
     cntp_m2 = await get_menu2_value(chat_id, "countertop", "м2")
     cntp_mp = await get_menu2_value(chat_id, "countertop", "м/п")
     cntp = f"{cntp_m2} м2 | {cntp_mp} п/м"
+
     wal_m2 = await get_menu2_value(chat_id, "wall", "м2")
     wal_mp = await get_menu2_value(chat_id, "wall", "м/п")
     wal  = f"{wal_m2} м2 | {wal_mp} п/м"
+
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
@@ -2062,9 +2083,11 @@ async def main():
     dp.callback_query.register(countertop_unit_menu, lambda c: c.data in {"counter_m2", "counter_mp"})
     dp.callback_query.register(countertop_back, lambda c: c.data == "counter_back")
     dp.message.register(countertop_value_input, Settings.countertop_input)
+
     dp.callback_query.register(wall_unit_menu, lambda c: c.data in {"wall_m2", "wall_mp"})
     dp.callback_query.register(wall_back, lambda c: c.data == "wall_back")
     dp.message.register(wall_value_input, Settings.wall_input)
+
     dp.message.register(menu2_item_input, Settings.menu2_item)
 
     # ─── Регистрация для меню 3 ─────────────────────────────
