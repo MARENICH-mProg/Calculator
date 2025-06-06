@@ -36,3 +36,7 @@ python main.py
 
 The bot uses inline keyboards for navigation. After adjusting all parameters, press "Рассчитать" to see the final calculation.
 
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
