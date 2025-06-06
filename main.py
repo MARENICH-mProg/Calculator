@@ -32,6 +32,7 @@ class Settings(StatesGroup):
     stone2 = State()  # ввод «Тип камня» на меню 2
     stone_price = State()  # ввод «Цена за камень» на меню 2
     menu2_item = State()  # для ввода Столешница/Стеновая/…/Бортики
+    menu2_item_unit = State()  # выбор единицы (м2 или м/п) для пункта меню 2
     menu2_takelage = State()  # *** новое состояние для выбора «такелаж» ***
     # ─── добавляем подменю 3 ────────────────────────────────
     menu3 = State()  # сам экран «меню 3»
@@ -1287,14 +1288,13 @@ async def back_to_main(call: CallbackQuery, state: FSMContext):
 
 # ─── 6.1) Переход в ввод конкретной строки меню 2 ─────────────
 async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
-    # Определяем, какая кнопка нажата: countertop, wall, boil, sink, glue или edges
+    """Показываем выбор единицы для ввода значения."""
     key = call.data  # «menu2_countertop» и т. д.
-    await state.set_state(Settings.menu2_item)
     await state.update_data(
         menu2_item_key=key,
         menu2_message_id=call.message.message_id,
-        measure_type="m2",
     )
+
     label = {
         "menu2_countertop": "Столешница",
         "menu2_wall": "Стеновая",
@@ -1303,9 +1303,44 @@ async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
         "menu2_glue": "Подклейка",
         "menu2_edges": "Бортики",
     }[key]
-    unit_type = "м2" if key in {"menu2_countertop", "menu2_wall", "menu2_edges"} else "шт"
-    msg = await call.message.answer(f"Введите значение для {label} ({unit_type}):")
+
+    if key in {"menu2_countertop", "menu2_wall", "menu2_edges"}:
+        await state.set_state(Settings.menu2_item_unit)
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="м2",   callback_data="menu2_unit_m2"),
+                InlineKeyboardButton(text="м/п", callback_data="menu2_unit_mp"),
+            ]
+        ])
+        await call.message.answer(
+            f"Введите значение для {label}: выберите единицу", reply_markup=kb
+        )
+    else:
+        await state.set_state(Settings.menu2_item)
+        unit_type = "шт"
+        msg = await call.message.answer(f"Введите значение для {label} ({unit_type}):")
+        await state.update_data(prompt_id=msg.message_id)
+    await call.answer()
+
+
+async def menu2_unit_choice(call: CallbackQuery, state: FSMContext):
+    """Обрабатывает выбор единицы для столешницы/стеновой/бортиков."""
+    choice = "m2" if call.data == "menu2_unit_m2" else "mp"
+    data = await state.get_data()
+    key = data["menu2_item_key"]
+    label = {
+        "menu2_countertop": "Столешница",
+        "menu2_wall": "Стеновая",
+        "menu2_edges": "Бортики",
+    }[key]
+
+    await state.update_data(measure_type=choice)
+    await state.set_state(Settings.menu2_item)
+    msg = await call.message.answer(
+        f"Введите значение для {label} ({'м2' if choice == 'm2' else 'м/п'}):"
+    )
     await state.update_data(prompt_id=msg.message_id)
+    await call.message.delete()
     await call.answer()
 
 # ─── 6.2) Обработка ввода текста для одной из шести строк ────
@@ -1342,16 +1377,12 @@ async def menu2_item_input(message: Message, state: FSMContext):
 
     if key in {"menu2_countertop", "menu2_wall", "menu2_edges"}:
         field = key.split("_")[1]  # countertop / wall / edges
-        await set_menu2_value(message.chat.id, field, "м2" if measure_type == "m2" else "м/п", to_store)
-        # если это был ввод м2, запрашиваем м/п
-        if measure_type == "m2":
-            label = {"countertop": "Столешница", "wall": "Стеновая", "edges": "Бортики"}[field]
-            msg = await message.answer(f"Введите значение для {label} (м/п):")
-            await state.update_data(measure_type="mp", prompt_id=msg.message_id)
-            await message.delete()
-            if prompt_id:
-                await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
-            return
+        await set_menu2_value(
+            message.chat.id,
+            field,
+            "м2" if measure_type == "m2" else "м/п",
+            to_store,
+        )
     else:
         # boil / sink / glue
         setter = {
@@ -1446,19 +1477,12 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     # ─── 1) Расчёт стоимости материала ────────────────────────────
 
     price_str = await get_stone_price(chat_id)       # строка, например "5000" или "не указано"
-    cntp_str  = await get_menu2_countertop(chat_id)      # строка, например "2.30" или "не указано"
-    wall_str  = await get_menu2_wall(chat_id)            # строка, например "1.50" или "не указано"
 
     def to_float(x: str) -> float:
         return float(x.replace(",", ".")) if x not in ("не указано", "") else 0.0
 
     price = to_float(price_str)
-    cntp  = to_float(cntp_str)
-    wall  = to_float(wall_str)
-
-    cost_cntp     = price * cntp
-    cost_wall     = price * wall
-    material_cost = cost_cntp + cost_wall
+    material_cost = price
 
     def fmt_num(v: float) -> str:
         # если целое, без десятичной части; иначе — через запятую с двумя знаками
@@ -1468,11 +1492,9 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
 
     material_log = [
         "📋 Расчёт стоимости материала:\n",
-        f"• Цена за камень: {fmt_num(price)} ₽/{unit}",
-        f"• Столешница: {cntp_str.replace('.',',')} {unit} × {fmt_num(price)} ₽ = {fmt_num(cost_cntp)} ₽",
-        f"• Стеновая:    {wall_str.replace('.',',')} {unit} × {fmt_num(price)} ₽ = {fmt_num(cost_wall)} ₽",
+        f"• Цена за камень: {fmt_num(price)} ₽",
         "─────────────────────────",
-        f"Итого материал: {fmt_num(material_cost)} ₽"
+        f"Итого материал: {fmt_num(material_cost)} ₽",
     ]
     # заменяем текст меню 3 на лог материала
     await call.message.edit_text("\n".join(material_log))
@@ -1792,6 +1814,7 @@ async def main():
     dp.callback_query.register(back_to_main, lambda c: c.data == "back_to_main")
     # ─── регистрируем шесть новых пунктов menu2 ──────────────
     dp.callback_query.register(menu2_item_menu, lambda c: c.data in {"menu2_countertop", "menu2_wall", "menu2_boil", "menu2_sink", "menu2_glue", "menu2_edges"})
+    dp.callback_query.register(menu2_unit_choice, lambda c: c.data in {"menu2_unit_m2", "menu2_unit_mp"})
     dp.message.register(menu2_item_input, Settings.menu2_item)
 
     # ─── Регистрация для меню 3 ─────────────────────────────
