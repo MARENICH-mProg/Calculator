@@ -1,7 +1,7 @@
 #API_TOKEN = "7908411125:AAFxJdhRYxke3mLVRa4Gxxy1Ow2dNk4Sf5w"
 
 import asyncio
-from db import connection
+from db import connection, close_db
 
 import aiosqlite
 from aiogram import Bot, Dispatcher, types
@@ -1677,7 +1677,11 @@ async def main():
     # ─── после этой строки идёт await dp.start_polling(bot) ───
 
     # Запускаем long-polling
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await close_db()
+        await bot.session.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
