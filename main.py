@@ -764,14 +764,17 @@ async def menu3_mop_input(message: Message, state: FSMContext):
 async def menu3_margin_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.menu3_margin)
     data = await state.get_data()
-    await state.update_data(menu3_message_id=data["menu3_message_id"])
-    msg = await call.message.answer("Введите маржу в % (целое число от 0 до 100):")
+    await state.update_data(menu3_message_id=data.get("menu3_message_id"))
+    msg = await call.message.answer(
+        "Введите маржу в % (целое число от 0 до 100):"
+    )
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def menu3_margin_input(message: Message, state: FSMContext):
     data       = await state.get_data()
-    menu3_id   = data["menu3_message_id"]
+    menu3_id   = data.get("menu3_message_id")
+    menu_id    = data.get("menu_message_id")
     prompt_id  = data.get("prompt_id")
     text       = message.text.strip()
     if not text.isdigit() or not (0 <= int(text) <= 100):
@@ -781,16 +784,30 @@ async def menu3_margin_input(message: Message, state: FSMContext):
     if prompt_id:
         await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
 
-    await state.set_state(Settings.menu3)
-    km_current     = await get_menu3_km(message.chat.id)
-    mop_current    = await get_menu3_mop(message.chat.id)
-    margin_current = await get_menu3_margin(message.chat.id)
-    await message.bot.edit_message_text(
-        text="Основное меню 3:",
-        chat_id=message.chat.id,
-        message_id=menu3_id,
-        reply_markup=menu3_kb(km_current, mop_current, margin_current)
-    )
+    if menu3_id:
+        await state.set_state(Settings.menu3)
+        km_current = await get_menu3_km(message.chat.id)
+        mop_current = await get_menu3_mop(message.chat.id)
+        margin_current = await get_menu3_margin(message.chat.id)
+        await message.bot.edit_message_text(
+            text="Основное меню 3:",
+            chat_id=message.chat.id,
+            message_id=menu3_id,
+            reply_markup=menu3_kb(km_current, mop_current, margin_current),
+        )
+    else:
+        await state.clear()
+        tax = await get_tax(message.chat.id)
+        fix = await get_measurement_fix(message.chat.id)
+        km = await get_measurement_km(message.chat.id)
+        mop = await get_menu3_mop(message.chat.id)
+        margin = await get_menu3_margin(message.chat.id)
+        await message.bot.edit_message_text(
+            text="Параметры:",
+            chat_id=message.chat.id,
+            message_id=menu_id,
+            reply_markup=main_menu(tax, fix, km, mop, margin),
+        )
 
 
 async def back_to_menu2(call: CallbackQuery, state: FSMContext):
