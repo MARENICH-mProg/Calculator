@@ -1,7 +1,7 @@
 #API_TOKEN = "7908411125:AAFxJdhRYxke3mLVRa4Gxxy1Ow2dNk4Sf5w"
 
 import asyncio
-from db import connection
+from db import connection, close_db
 
 import aiosqlite
 from aiogram import Bot, Dispatcher, types
@@ -30,7 +30,7 @@ class Settings(StatesGroup):
     salary_item = State()  # выбрали пункт меню (столешница/…)
     menu2 = State()  # второй экран меню
     stone2 = State()  # ввод «Тип камня» на меню 2
-    price_meter = State()  # ввод «Цена за метр» на меню 2
+    stone_price = State()  # ввод «Цена за камень» на меню 2
     menu2_item = State()  # для ввода Столешница/Стеновая/…/Бортики
     menu2_takelage = State()  # *** новое состояние для выбора «такелаж» ***
     # ─── добавляем подменю 3 ────────────────────────────────
@@ -104,8 +104,8 @@ async def init_db():
         # ─── добавляем колонки для меню 2 ────────────────────────
         if "general_stone_type" not in cols:
             await db.execute("ALTER TABLE user_settings ADD COLUMN general_stone_type TEXT DEFAULT 'не указано'")
-        if "price_per_meter" not in cols:
-            await db.execute("ALTER TABLE user_settings ADD COLUMN price_per_meter TEXT DEFAULT 'не указано'")
+        if "stone_price" not in cols:
+            await db.execute("ALTER TABLE user_settings ADD COLUMN stone_price TEXT DEFAULT 'не указано'")
 
         # ─── меню 2: шесть полей для ручного ввода ─────────────────
         for col in (
@@ -288,15 +288,15 @@ async def set_general_stone_type(chat_id: int, value: str):
         """, (chat_id, value))
         await db.commit()
 
-async def get_price_per_meter(chat_id: int) -> str:
+async def get_stone_price(chat_id: int) -> str:
     async with connection() as db:
         cur = await db.execute(
-            "SELECT price_per_meter FROM user_settings WHERE chat_id = ?", (chat_id,)
+            "SELECT stone_price FROM user_settings WHERE chat_id = ?", (chat_id,)
         )
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
-# ─── после set_price_per_meter ───────────────────────────────
+# ─── после set_stone_price ───────────────────────────────
 async def get_menu2_countertop(chat_id: int) -> str:
     async with connection() as db:
         cur = await db.execute("SELECT menu2_countertop FROM user_settings WHERE chat_id = ?", (chat_id,))
@@ -490,12 +490,12 @@ async def set_menu3_margin(chat_id: int, value: str):
 
 # ─── далее продолжается остальной код ────────────────────────
 
-async def set_price_per_meter(chat_id: int, value: str):
+async def set_stone_price(chat_id: int, value: str):
     async with connection() as db:
         await db.execute("""
-            INSERT INTO user_settings(chat_id, price_per_meter)
+            INSERT INTO user_settings(chat_id, stone_price)
             VALUES (?, ?)
-            ON CONFLICT(chat_id) DO UPDATE SET price_per_meter = excluded.price_per_meter
+            ON CONFLICT(chat_id) DO UPDATE SET stone_price = excluded.stone_price
         """, (chat_id, value))
         await db.commit()
 # ─── далее идёт ваша логика меню/хендлеров ───────────────────
@@ -578,7 +578,7 @@ def menu2_kb(stone: str, price: str,
     """
     Теперь menu2_kb получает 10 аргументов:
     1) stone  – выбранный тип камня
-    2) price  – цена за метр
+    2) price  – цена за камень
     3) cntp   – Столешница
     4) wal    – Стеновая
     5) bo     – Вырез варка
@@ -590,7 +590,7 @@ def menu2_kb(stone: str, price: str,
     """
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"Тип камня | {stone}",        callback_data="set_first_stone")],
-        [InlineKeyboardButton(text=f"Цена за метр | {price}",     callback_data="set_price_meter")],
+        [InlineKeyboardButton(text=f"Цена за камень | {price}",   callback_data="set_stone_price")],
         [InlineKeyboardButton(text=f"Столешница | {cntp} | {unit}", callback_data="menu2_countertop")],
         [InlineKeyboardButton(text=f"Стеновая | {wal} | {unit}",   callback_data="menu2_wall")],
         [
@@ -762,7 +762,7 @@ async def back_to_menu2(call: CallbackQuery, state: FSMContext):
     menu2_id = data["menu2_message_id"]
 
     current_stone  = await get_general_stone_type(chat_id)
-    current_price  = await get_price_per_meter(chat_id)
+    current_price  = await get_stone_price(chat_id)
     unit           = await get_unit(chat_id)
     cntp = await get_menu2_value(chat_id, "countertop", unit)
     wal  = await get_menu2_value(chat_id, "wall", unit)
@@ -1077,7 +1077,7 @@ async def to_menu2(call: CallbackQuery, state: FSMContext):
 
     chat_id = call.message.chat.id
     current_stone  = await get_general_stone_type(chat_id)
-    current_price  = await get_price_per_meter(chat_id)
+    current_price  = await get_stone_price(chat_id)
     unit           = await get_unit(chat_id)
     cntp           = await get_menu2_value(chat_id, "countertop", unit)
     wal            = await get_menu2_value(chat_id, "wall", unit)
@@ -1119,7 +1119,7 @@ async def stone2_selected(call: CallbackQuery, state: FSMContext):
     data    = await state.get_data()
     menu2_id = data["menu2_message_id"]
 
-    current_price = await get_price_per_meter(chat_id)
+    current_price = await get_stone_price(chat_id)
     unit          = await get_unit(chat_id)
     cntp = await get_menu2_value(chat_id, "countertop", unit)
     wal  = await get_menu2_value(chat_id, "wall", unit)
@@ -1144,16 +1144,16 @@ async def stone2_selected(call: CallbackQuery, state: FSMContext):
 
 
 
-async def price_meter_menu(call: CallbackQuery, state: FSMContext):
-    # Переключаемся в состояние ввода цены за метр
-    await state.set_state(Settings.price_meter)
+async def stone_price_menu(call: CallbackQuery, state: FSMContext):
+    # Переключаемся в состояние ввода цены за камень
+    await state.set_state(Settings.stone_price)
     data = await state.get_data()
     await state.update_data(menu2_message_id=data["menu2_message_id"])
-    msg = await call.message.answer("Введите цену за метр (только цифры):")
+    msg = await call.message.answer("Введите цену за камень (только цифры):")
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
-async def price_meter_input(message: Message, state: FSMContext):
+async def stone_price_input(message: Message, state: FSMContext):
     data     = await state.get_data()
     menu2_id = data["menu2_message_id"]
     prompt_id = data.get("prompt_id")
@@ -1162,7 +1162,7 @@ async def price_meter_input(message: Message, state: FSMContext):
         return await message.reply("Неверно. Введите число, например: 5000")
 
     chat_id = message.chat.id
-    await set_price_per_meter(chat_id, text)
+    await set_stone_price(chat_id, text)
     await message.delete()
     if prompt_id:
         await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
@@ -1290,7 +1290,7 @@ async def menu2_item_input(message: Message, state: FSMContext):
     # 5) Возвращаемся в menu2, подгружая все шесть значений и остальные параметры заново
     await state.set_state(Settings.menu2)
     current_stone = await get_general_stone_type(message.chat.id)
-    current_price = await get_price_per_meter(message.chat.id)
+    current_price = await get_stone_price(message.chat.id)
     unit = await get_unit(message.chat.id)
     cntp = await get_menu2_value(message.chat.id, "countertop", unit)
     wal  = await get_menu2_value(message.chat.id, "wall", unit)
@@ -1326,7 +1326,7 @@ async def menu2_takelage_input(call: CallbackQuery, state: FSMContext):
 
     # Повторно читаем все поля, включая только что установленный takelage
     current_stone  = await get_general_stone_type(chat_id)
-    current_price  = await get_price_per_meter(chat_id)
+    current_price  = await get_stone_price(chat_id)
     unit           = await get_unit(chat_id)
     cntp = await get_menu2_value(chat_id, "countertop", unit)
     wal  = await get_menu2_value(chat_id, "wall", unit)
@@ -1365,9 +1365,10 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     installer_unit = await get_installer_unit(chat_id)
 
     # ─── 1) Расчёт стоимости материала ────────────────────────────
-    price_str = await get_price_per_meter(chat_id)       # строка, например "5000" или "не указано"
-    cntp_str  = await get_menu2_value(chat_id, "countertop", unit)
-    wall_str  = await get_menu2_value(chat_id, "wall", unit)
+
+    price_str = await get_stone_price(chat_id)       # строка, например "5000" или "не указано"
+    cntp_str  = await get_menu2_countertop(chat_id)      # строка, например "2.30" или "не указано"
+    wall_str  = await get_menu2_wall(chat_id)            # строка, например "1.50" или "не указано"
 
     def to_float(x: str) -> float:
         return float(x.replace(",", ".")) if x not in ("не указано", "") else 0.0
@@ -1388,7 +1389,7 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
 
     material_log = [
         "📋 Расчёт стоимости материала:\n",
-        f"• Цена за метр: {fmt_num(price)} ₽/{unit}",
+        f"• Цена за камень: {fmt_num(price)} ₽/{unit}",
         f"• Столешница: {cntp_str.replace('.',',')} {unit} × {fmt_num(price)} ₽ = {fmt_num(cost_cntp)} ₽",
         f"• Стеновая:    {wall_str.replace('.',',')} {unit} × {fmt_num(price)} ₽ = {fmt_num(cost_wall)} ₽",
         "─────────────────────────",
@@ -1704,8 +1705,8 @@ async def main():
     dp.callback_query.register(to_menu2, lambda c: c.data == "to_menu2")
     dp.callback_query.register(first_stone_choice, lambda c: c.data == "set_first_stone")
     dp.callback_query.register(stone2_selected, lambda c: c.data in ("stone2_acryl", "stone2_quartz"))
-    dp.callback_query.register(price_meter_menu, lambda c: c.data == "set_price_meter")
-    dp.message.register(price_meter_input, Settings.price_meter)
+    dp.callback_query.register(stone_price_menu, lambda c: c.data == "set_stone_price")
+    dp.message.register(stone_price_input, Settings.stone_price)
     dp.callback_query.register(back_to_main, lambda c: c.data == "back_to_main")
     # ─── регистрируем шесть новых пунктов menu2 ──────────────
     dp.callback_query.register(menu2_item_menu, lambda c: c.data in {"menu2_countertop", "menu2_wall", "menu2_boil", "menu2_sink", "menu2_glue", "menu2_edges"})
@@ -1736,7 +1737,11 @@ async def main():
     # ─── после этой строки идёт await dp.start_polling(bot) ───
 
     # Запускаем long-polling
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await close_db()
+        await bot.session.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
