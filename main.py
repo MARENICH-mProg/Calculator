@@ -1141,6 +1141,10 @@ async def salary_unit_menu(call: CallbackQuery, state: FSMContext):
 
 async def salary_unit_choice(call: CallbackQuery, state: FSMContext):
     parts = call.data.split("_")  # salary_role_stone_unit_m2/mp
+    if len(parts) < 5:
+        # protect against malformed callback data
+        await call.answer("Некорректные данные", show_alert=True)
+        return
     role, stone, choice_part = parts[1], parts[2], parts[4]
     choice = "м2" if choice_part == "m2" else "м/п"
     chat_id = call.message.chat.id
@@ -1819,8 +1823,17 @@ async def main():
                 }
         )
     )
-    dp.callback_query.register(salary_unit_menu, lambda c: c.data.endswith("_unit"))
-    dp.callback_query.register(salary_unit_choice, lambda c: c.data.endswith("_unit_m2") or c.data.endswith("_unit_mp"))
+    dp.callback_query.register(
+        salary_unit_menu,
+        lambda c: c.data.startswith("salary_") and c.data.endswith("_unit")
+    )
+    dp.callback_query.register(
+        salary_unit_choice,
+        lambda c: (
+            c.data.startswith("salary_")
+            and (c.data.endswith("_unit_m2") or c.data.endswith("_unit_mp"))
+        )
+    )
     dp.message.register     (salary_item_input,     Settings.salary_item)
     # ─── Регистрация для меню 2 ─────────────────────────────
     dp.callback_query.register(to_menu2, lambda c: c.data == "to_menu2")
