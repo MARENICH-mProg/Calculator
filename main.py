@@ -566,7 +566,7 @@ def salary_item_kb(role: str, stone: str, unit: str, values: dict[str,str]) -> I
         ],[
             InlineKeyboardButton(text=f"Стеновая | {values['wall']} | {unit}",       callback_data=f"salary_{role}_{stone}_wall")
         ],[
-            InlineKeyboardButton(text=f"Доставка | фикс {values['delivery_fix']} | км {values['delivery_km']}", callback_data=f"salary_{role}_{stone}_delivery"),
+            InlineKeyboardButton(text=f"Доставка | фикс {values['delivery']} | км {values['delivery_km']}", callback_data=f"salary_{role}_{stone}_delivery"),
             InlineKeyboardButton(text=f"Такелаж | {values['takelage']} | {unit}",     callback_data=f"salary_{role}_{stone}_takelage")
         ]]
     kb.append([InlineKeyboardButton(text=f"Ед. измерения | {unit}", callback_data=f"salary_{role}_{stone}_unit")])
@@ -1015,7 +1015,7 @@ async def salary_stone_choice(call: CallbackQuery, state: FSMContext):
     if role=="master":
         keys += ["boil","sink","glue","edges"]
     else:
-        keys += ["delivery_fix","delivery_km","takelage"]
+        keys += ["delivery","delivery_km","takelage"]
     values = {k: await get_salary(call.message.chat.id, f"master_{stone}_{k}" if role=="master" else f"installer_{stone}_{k}")
               for k in keys}
     await call.message.edit_text(
@@ -1098,7 +1098,7 @@ async def salary_item_input(message: Message, state: FSMContext):
     else:
         unit = await get_installer_unit(message.chat.id)
     # заново собрать values как в B)
-    keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery_fix","delivery_km","takelage"])
+    keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery","delivery_km","takelage"])
     values = {k: await get_salary(message.chat.id, f"{role}_{stone}_{k}") for k in keys}
     await message.bot.edit_message_text(
         text=f"Установки для { 'акрилового' if stone=='acryl' else 'кварцевого' } камня:",
@@ -1134,7 +1134,7 @@ async def salary_unit_choice(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     menu_id = data["menu_message_id"]
     # восстановим значения
-    keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery_fix","delivery_km","takelage"])
+    keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery","delivery_km","takelage"])
     values = {k: await get_salary(chat_id, f"{role}_{stone}_{k}") for k in keys}
     unit = choice
     await call.message.bot.edit_message_text(
