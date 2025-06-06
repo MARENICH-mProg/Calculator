@@ -217,7 +217,6 @@ async def set_tax(chat_id: int, value: str):
         """, (chat_id, value))
         await db.commit()
 
-# ─── вставьте ниже утилиты для measurement ──────────────────
 async def get_measurement_fix(chat_id: int) -> str:
     async with connection() as db:
         cur = await db.execute("SELECT measurement_fix FROM user_settings WHERE chat_id = ?", (chat_id,))
@@ -254,7 +253,6 @@ async def set_master_salary(chat_id: int, key: str, value: str):
         """, (chat_id, value))
         await db.commit()
 
-# ─── вставьте сразу после set_master_salary ─────────────────
 async def get_salary(chat_id: int, column: str) -> str:
     async with connection() as db:
         cur = await db.execute(f"SELECT {column} FROM user_settings WHERE chat_id = ?", (chat_id,))
@@ -527,7 +525,6 @@ def main_menu(tax_value: str, fix_value: str, km_value: str, mop_value: str, mar
         [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu2")],
     ])
 
-# ─── вставьте здесь подменю measurement ─────────────────────
 def meas_submenu(fix: str, km: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -537,7 +534,6 @@ def meas_submenu(fix: str, km: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="← Назад", callback_data="meas_back")],
     ])
 
-# ─── вставьте после meas_submenu ───────────────────────────
 def stone_menu_kb(role: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Акрил",  callback_data=f"salary_{role}_acryl")],
@@ -825,14 +821,14 @@ async def back_to_menu2(call: CallbackQuery, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", unit)
-    tak  = await get_menu2_takelage(chat_id)  # <<< читаем
+    tak  = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
         "Основное меню 2:",
         reply_markup=menu2_kb(
             current_stone, current_price,
             cntp, wal, bo, si, gl, ed,
-            tak,                # <<< сюда
+            tak,
             unit
         )
     )
@@ -919,7 +915,6 @@ async def tax_input(message: Message, state: FSMContext):
         reply_markup=main_menu(tax, fix, km, mop, margin)
     )
 
-# ─── вставьте сюда хендлеры для measurement ────────────────
 async def set_measurement_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.meas_menu)
     await state.update_data(menu_message_id=call.message.message_id)
@@ -1184,14 +1179,14 @@ async def to_menu2(call: CallbackQuery, state: FSMContext):
     si             = await get_menu2_sink(chat_id)
     gl             = await get_menu2_glue(chat_id)
     ed             = await get_menu2_value(chat_id, "edges", unit)
-    tak            = await get_menu2_takelage(chat_id)   # <<< читаем новое поле
+    tak            = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
         "Основное меню 2:",
         reply_markup=menu2_kb(
             current_stone, current_price,
             cntp, wal, bo, si, gl, ed,
-            tak,         # <<< передаем его
+            tak,
             unit
         )
     )
@@ -1226,7 +1221,7 @@ async def stone2_selected(call: CallbackQuery, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", unit)
-    tak  = await get_menu2_takelage(chat_id)  # <<< вот он
+    tak  = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
         "Основное меню 2:",
@@ -1234,7 +1229,7 @@ async def stone2_selected(call: CallbackQuery, state: FSMContext):
             selected,           # тип камня
             current_price,
             cntp, wal, bo, si, gl, ed,
-            tak,                # <<< и передаём
+            tak,
             unit
         )
     )
@@ -1277,7 +1272,7 @@ async def stone_price_input(message: Message, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", unit)
-    tak  = await get_menu2_takelage(chat_id)  # <<< читаем такелаж
+    tak  = await get_menu2_takelage(chat_id)
 
     await message.bot.edit_message_text(
         text="Основное меню 2:",
@@ -1286,7 +1281,7 @@ async def stone_price_input(message: Message, state: FSMContext):
         reply_markup=menu2_kb(
             current_stone, current_price,
             cntp, wal, bo, si, gl, ed,
-            tak,                # <<< и сюда
+            tak,
             unit
         )
     )
@@ -1796,7 +1791,6 @@ async def main():
     dp.callback_query.register(set_tax_menu,   lambda c: c.data == "set_tax_system")
     dp.message.register     (tax_input, Settings.tax)
 
-    # ─── вставьте регистрацию measurement ─────────────
     dp.callback_query.register(set_measurement_menu, lambda c: c.data == "set_measurement_cost")
     dp.callback_query.register(meas_fix_menu, lambda c: c.data == "meas_fix")
     dp.callback_query.register(price_inst_deliv_km_menu, lambda c: c.data == "meas_km")
