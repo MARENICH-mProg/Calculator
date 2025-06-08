@@ -1985,7 +1985,7 @@ async def main():
 
     dp.callback_query.register(set_measurement_menu, lambda c: c.data == "set_measurement_cost")
     dp.callback_query.register(meas_fix_menu, lambda c: c.data == "meas_fix")
-    dp.callback_query.register(price_inst_deliv_km_menu, lambda c: c.data == "meas_km")
+    dp.callback_query.register(price_inst_deliv_km_menu, lambda c: c.data == "price_inst_deliv_km")
     dp.callback_query.register(meas_back, lambda c: c.data == "meas_back")
     dp.message.register(meas_fix_input, Settings.meas_fix)
     dp.message.register(price_inst_deliv_km_input, Settings.meas_km)
