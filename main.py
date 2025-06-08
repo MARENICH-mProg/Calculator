@@ -59,6 +59,11 @@ class Settings(StatesGroup):
     menu3_mop = State()  # ввод «проценты МОПу»
     menu3_margin = State()  # ввод «маржа»
 
+    tax_stone    = State()  # выбор камня для налогов
+    mop_stone    = State()  # выбор камня для МОП
+    margin_stone = State()  # выбор камня для маржи
+
+
 # ─── 2) Инициализация базы ────────────────────────────────────
 async def init_db():
     async with connection() as db:
@@ -68,12 +73,14 @@ async def init_db():
                 chat_id                   INTEGER PRIMARY KEY,
                 unit                      TEXT    DEFAULT 'не выбрано',
                 tax_percent               TEXT    DEFAULT 'не указано',
+
                 tax_percent_quartz        TEXT    DEFAULT 'не указано',
                 tax_percent_acryl         TEXT    DEFAULT 'не указано',
                 mop_percent_quartz        TEXT    DEFAULT 'не указано',
                 mop_percent_acryl         TEXT    DEFAULT 'не указано',
                 margin_percent_quartz     TEXT    DEFAULT 'не указано',
                 margin_percent_acryl      TEXT    DEFAULT 'не указано',
+
                 measurement_fix           TEXT    DEFAULT 'не указано',
                 measurement_km            TEXT    DEFAULT 'не указано',
                 master_unit               TEXT    DEFAULT 'не выбрано',
@@ -95,6 +102,17 @@ async def init_db():
         # 2) Узнаём, какие колонки уже есть
         cursor = await db.execute("PRAGMA table_info(user_settings)")
         cols = [row[1] for row in await cursor.fetchall()]
+
+        # 2a) Добавляем новые колонки для налогов, МОП и маржи по типам камня
+        for col in (
+            "tax_acryl", "tax_quartz",
+            "mop_acryl", "mop_quartz",
+            "margin_acryl", "margin_quartz",
+        ):
+            if col not in cols:
+                await db.execute(
+                    f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'"
+                )
 
         # 3) Обязательно добавляем measurement-колонки
         for col in ("measurement_fix", "measurement_km"):
@@ -165,17 +183,30 @@ async def init_db():
                     f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'"
                 )
 
+
         # ─── новые колонки для процентов по камню ───────────────
         pct_cols = [
             "tax_percent_quartz", "tax_percent_acryl",
             "mop_percent_quartz", "mop_percent_acryl",
             "margin_percent_quartz", "margin_percent_acryl",
+
         ]
         for col in pct_cols:
             if col not in cols:
                 await db.execute(
                     f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'"
                 )
+
+
+        # дополнительные колонки для налогов/МОП/маржи по камням
+        for col in (
+            "tax_acryl", "tax_quartz",
+            "mop_acryl", "mop_quartz",
+            "margin_acryl", "margin_quartz",
+        ):
+            if col not in cols:
+                await db.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'")
+
 
         await db.commit()
 
@@ -241,10 +272,9 @@ async def set_installer_unit(chat_id: int, value: str):
 
 
 async def get_tax(chat_id: int) -> str:
-    async with connection() as db:
-        cur = await db.execute("SELECT tax_percent FROM user_settings WHERE chat_id = ?", (chat_id,))
-        row = await cur.fetchone()
-        return row[0] if row else "не указано"
+    quartz = await get_tax_value(chat_id, "quartz")
+    acryl  = await get_tax_value(chat_id, "acryl")
+    return f"кварц {quartz}% | акрил {acryl}%"
 
 
 async def set_tax(chat_id: int, value: str):
@@ -257,7 +287,9 @@ async def set_tax(chat_id: int, value: str):
         await db.commit()
 
 async def get_tax_percent(chat_id: int, stone: str) -> str:
+
     column = f"tax_percent_{stone}"
+
     async with connection() as db:
         cur = await db.execute(
             f"SELECT {column} FROM user_settings WHERE chat_id = ?",
@@ -266,8 +298,10 @@ async def get_tax_percent(chat_id: int, stone: str) -> str:
         row = await cur.fetchone()
         return row[0] if row else "не указано"
 
+
 async def set_tax_percent(chat_id: int, stone: str, value: str):
     column = f"tax_percent_{stone}"
+
     async with connection() as db:
         await db.execute(
             f"""
@@ -520,10 +554,9 @@ async def set_menu3_km(chat_id: int, value: str):
         await db.commit()
 
 async def get_menu3_mop(chat_id: int) -> str:
-    async with connection() as db:
-        cur = await db.execute("SELECT menu3_mop FROM user_settings WHERE chat_id = ?", (chat_id,))
-        row = await cur.fetchone()
-        return row[0] if row else "не указано"
+    quartz = await get_mop_value(chat_id, "quartz")
+    acryl  = await get_mop_value(chat_id, "acryl")
+    return f"кварц {quartz}% | акрил {acryl}%"
 
 async def set_menu3_mop(chat_id: int, value: str):
     async with connection() as db:
@@ -535,10 +568,9 @@ async def set_menu3_mop(chat_id: int, value: str):
         await db.commit()
 
 async def get_menu3_margin(chat_id: int) -> str:
-    async with connection() as db:
-        cur = await db.execute("SELECT menu3_margin FROM user_settings WHERE chat_id = ?", (chat_id,))
-        row = await cur.fetchone()
-        return row[0] if row else "не указано"
+    quartz = await get_margin_value(chat_id, "quartz")
+    acryl  = await get_margin_value(chat_id, "acryl")
+    return f"кварц {quartz}% | акрил {acryl}%"
 
 async def set_menu3_margin(chat_id: int, value: str):
     async with connection() as db:
@@ -548,6 +580,7 @@ async def set_menu3_margin(chat_id: int, value: str):
             ON CONFLICT(chat_id) DO UPDATE SET menu3_margin = excluded.menu3_margin
         """, (chat_id, value))
         await db.commit()
+
 
 async def get_mop_percent(chat_id: int, stone: str) -> str:
     column = f"mop_percent_{stone}"
@@ -561,6 +594,7 @@ async def get_mop_percent(chat_id: int, stone: str) -> str:
 
 async def set_mop_percent(chat_id: int, stone: str, value: str):
     column = f"mop_percent_{stone}"
+
     async with connection() as db:
         await db.execute(
             f"""
@@ -571,6 +605,7 @@ async def set_mop_percent(chat_id: int, stone: str, value: str):
             (chat_id, value),
         )
         await db.commit()
+
 
 async def get_margin_percent(chat_id: int, stone: str) -> str:
     column = f"margin_percent_{stone}"
@@ -584,6 +619,7 @@ async def get_margin_percent(chat_id: int, stone: str) -> str:
 
 async def set_margin_percent(chat_id: int, stone: str, value: str):
     column = f"margin_percent_{stone}"
+
     async with connection() as db:
         await db.execute(
             f"""
@@ -619,6 +655,7 @@ async def set_measurement_km(chat_id: int, value: str):
 # ─── после этой строки идут функции main_menu и далее ────────
 
 # ─── 4) Построение главного меню ─────────────────────────────
+
 def _display_pct(value: str) -> str:
     return value if "%" in value else f"{value}%"
 
@@ -651,6 +688,7 @@ def main_menu(
             [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu2")],
         ]
     )
+
 
 def meas_submenu(fix: str, km: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -824,6 +862,7 @@ async def menu3_km_input(message: Message, state: FSMContext):
     menu3_id   = data.get("menu3_message_id")
     menu_id    = data.get("menu_message_id")
     prompt_id  = data.get("prompt_id")
+    stone      = data.get("stone")
     text       = message.text.strip()
     if not text.isdigit():
         return await message.reply("Неверный формат. Введите целое число, например: 10")
@@ -870,10 +909,14 @@ async def menu3_mop_input(message: Message, state: FSMContext):
     menu3_id   = data.get("menu3_message_id")
     menu_id    = data.get("menu_message_id")
     prompt_id  = data.get("prompt_id")
+    stone      = data.get("stone")
     text       = message.text.strip()
     if not text.isdigit() or not (0 <= int(text) <= 100):
         return await message.reply("Неверный формат. Введите целое число от 0 до 100.")
-    await set_menu3_mop(message.chat.id, text)
+    if stone:
+        await set_mop_value(message.chat.id, stone, text)
+    else:
+        await set_menu3_mop(message.chat.id, text)
     await message.delete()
     if prompt_id:
         await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
@@ -921,7 +964,10 @@ async def menu3_margin_input(message: Message, state: FSMContext):
     text       = message.text.strip()
     if not text.isdigit() or not (0 <= int(text) <= 100):
         return await message.reply("Неверный формат. Введите целое число от 0 до 100.")
-    await set_menu3_margin(message.chat.id, text)
+    if stone:
+        await set_margin_value(message.chat.id, stone, text)
+    else:
+        await set_menu3_margin(message.chat.id, text)
     await message.delete()
     if prompt_id:
         await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
@@ -1020,13 +1066,26 @@ async def unit_choice(call: CallbackQuery, state: FSMContext):
 
 
 async def set_tax_menu(call: CallbackQuery, state: FSMContext):
-    # Переходим в состояние ввода налога
-    await state.set_state(Settings.tax)
-    # Сохраняем ID этого сообщения
+    await state.set_state(Settings.tax_stone)
     await state.update_data(menu_message_id=call.message.message_id)
-    # Отправляем отдельное сообщение с запросом
-    msg = await call.message.answer("Введи, какой процент налогов ты платишь:")
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Акрил", callback_data="tax_stone_acryl")],
+        [InlineKeyboardButton(text="Кварц", callback_data="tax_stone_quartz")],
+    ])
+    msg = await call.message.answer("Выберите тип камня:", reply_markup=kb)
     await state.update_data(prompt_id=msg.message_id)
+    await call.answer()
+
+async def tax_stone_choice(call: CallbackQuery, state: FSMContext):
+    stone = "acryl" if call.data.endswith("acryl") else "quartz"
+    data = await state.get_data()
+    prompt_id = data.get("prompt_id")
+    await state.set_state(Settings.tax)
+    await state.update_data(stone=stone)
+    await safe_edit_message_text(
+        call.message.edit_text,
+        "Введите процент (целое число от 0 до 100):",
+    )
     await call.answer()
 
 
@@ -1034,13 +1093,17 @@ async def tax_input(message: Message, state: FSMContext):
     data = await state.get_data()
     menu_id = data.get("menu_message_id")
     prompt_id = data.get("prompt_id")
+    stone = data.get("stone")
 
     text = message.text.strip().rstrip('%')
     if not text.isdigit():
         return await message.reply("Неверный формат. Введите число (например, 15).")
 
     # 1) Сохраняем процент в БД
-    await set_tax(message.chat.id, text)
+    if stone:
+        await set_tax_value(message.chat.id, stone, text)
+    else:
+        await set_tax(message.chat.id, text)
 
     # 2) Удаляем сообщение пользователя и подсказку
     await message.bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
@@ -1140,17 +1203,45 @@ async def price_inst_deliv_km_input(message: Message, state: FSMContext):
     )
 
 async def set_mop_main(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Settings.menu3_mop)
+    await state.set_state(Settings.mop_stone)
     await state.update_data(menu_message_id=call.message.message_id)
-    msg = await call.message.answer("Введите проценты МОПу (целое число от 0 до 100):")
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Акрил", callback_data="mop_stone_acryl")],
+        [InlineKeyboardButton(text="Кварц", callback_data="mop_stone_quartz")],
+    ])
+    msg = await call.message.answer("Выберите тип камня:", reply_markup=kb)
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
+async def mop_stone_choice(call: CallbackQuery, state: FSMContext):
+    stone = "acryl" if call.data.endswith("acryl") else "quartz"
+    await state.set_state(Settings.menu3_mop)
+    await state.update_data(stone=stone)
+    await safe_edit_message_text(
+        call.message.edit_text,
+        "Введите проценты МОПу (целое число от 0 до 100):",
+    )
+    await call.answer()
+
 async def set_margin_main(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Settings.menu3_margin)
+    await state.set_state(Settings.margin_stone)
     await state.update_data(menu_message_id=call.message.message_id)
-    msg = await call.message.answer("Введите маржу в % (целое число от 0 до 100):")
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Акрил", callback_data="margin_stone_acryl")],
+        [InlineKeyboardButton(text="Кварц", callback_data="margin_stone_quartz")],
+    ])
+    msg = await call.message.answer("Выберите тип камня:", reply_markup=kb)
     await state.update_data(prompt_id=msg.message_id)
+    await call.answer()
+
+async def margin_stone_choice(call: CallbackQuery, state: FSMContext):
+    stone = "acryl" if call.data.endswith("acryl") else "quartz"
+    await state.set_state(Settings.menu3_margin)
+    await state.update_data(stone=stone)
+    await safe_edit_message_text(
+        call.message.edit_text,
+        "Введите маржу в % (целое число от 0 до 100):",
+    )
     await call.answer()
 
 async def salary_role_menu(call: CallbackQuery, state: FSMContext):
@@ -2042,15 +2133,17 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     ]
 
     # ─── 6) Итоговая стоимость для клиента ─────────────────────────
-    # читаем проценты: маржа, МОП (menu3_mop), налог из меню 1
-    raw_margin = await get_menu3_margin(chat_id)  # строка, напр. "15" или "не указано"
-    raw_mop = await get_menu3_mop(chat_id)  # строка, напр. "5" или "не указано"
-    raw_tax = await get_tax(chat_id)  # строка, напр. "13" или "не указано"
+
+    # читаем проценты с учётом выбранного камня
+    raw_margin = await get_margin_value(chat_id, stone_key)
+    raw_mop    = await get_mop_value(chat_id, stone_key)
+    raw_tax    = await get_tax_value(chat_id, stone_key)
+
 
     # преобразуем к float, если не указано — 0
-    margin = float(raw_margin) if raw_margin.isdigit() else 0.0
-    mop = float(raw_mop) if raw_mop.isdigit() else 0.0
-    tax = float(raw_tax) if raw_tax.isdigit() else 0.0
+    margin = to_float_zero(raw_margin)
+    mop = to_float_zero(raw_mop)
+    tax = to_float_zero(raw_tax)
 
     total_pct = margin + mop + tax  # суммарный %
     # защищаемся от деления на ноль
@@ -2115,6 +2208,7 @@ async def main():
     dp.callback_query.register(unit_choice,   lambda c: c.data in ("unit_m2", "unit_mp"))
 
     dp.callback_query.register(set_tax_menu,   lambda c: c.data == "set_tax_system")
+    dp.callback_query.register(tax_stone_choice, lambda c: c.data in {"tax_stone_acryl", "tax_stone_quartz"})
     dp.message.register     (tax_input, Settings.tax)
 
     dp.callback_query.register(set_measurement_menu, lambda c: c.data == "set_measurement_cost")
@@ -2124,7 +2218,9 @@ async def main():
     dp.message.register(meas_fix_input, Settings.meas_fix)
     dp.message.register(price_inst_deliv_km_input, Settings.meas_km)
     dp.callback_query.register(set_mop_main, lambda c: c.data == "set_mop")
+    dp.callback_query.register(mop_stone_choice, lambda c: c.data in {"mop_stone_acryl", "mop_stone_quartz"})
     dp.callback_query.register(set_margin_main, lambda c: c.data == "set_margin")
+    dp.callback_query.register(margin_stone_choice, lambda c: c.data in {"margin_stone_acryl", "margin_stone_quartz"})
     # dp.callback_query.register(set_master_menu, lambda c: c.data == "set_master_salary")
     # dp.callback_query.register(master_type_choice, lambda c: c.data in ("master_acryl", "master_quartz"))
     # dp.callback_query.register(master_type_back, lambda c: c.data == "master_back")
