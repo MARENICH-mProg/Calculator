@@ -3,8 +3,7 @@
 import asyncio
 from db import connection, close_db
 
-import aiosqlite
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -631,6 +630,75 @@ async def set_margin_percent(chat_id: int, stone: str, value: str):
         )
         await db.commit()
 
+async def get_tax_value(chat_id: int, stone: str) -> str:
+    column = f"tax_{stone}"
+    async with connection() as db:
+        cur = await db.execute(
+            f"SELECT {column} FROM user_settings WHERE chat_id = ?",
+            (chat_id,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else "не указано"
+
+async def set_tax_value(chat_id: int, stone: str, value: str):
+    column = f"tax_{stone}"
+    async with connection() as db:
+        await db.execute(
+            f"""
+            INSERT INTO user_settings(chat_id, {column})
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET {column} = excluded.{column}
+            """,
+            (chat_id, value),
+        )
+        await db.commit()
+
+async def get_mop_value(chat_id: int, stone: str) -> str:
+    column = f"mop_{stone}"
+    async with connection() as db:
+        cur = await db.execute(
+            f"SELECT {column} FROM user_settings WHERE chat_id = ?",
+            (chat_id,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else "не указано"
+
+async def set_mop_value(chat_id: int, stone: str, value: str):
+    column = f"mop_{stone}"
+    async with connection() as db:
+        await db.execute(
+            f"""
+            INSERT INTO user_settings(chat_id, {column})
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET {column} = excluded.{column}
+            """,
+            (chat_id, value),
+        )
+        await db.commit()
+
+async def get_margin_value(chat_id: int, stone: str) -> str:
+    column = f"margin_{stone}"
+    async with connection() as db:
+        cur = await db.execute(
+            f"SELECT {column} FROM user_settings WHERE chat_id = ?",
+            (chat_id,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else "не указано"
+
+async def set_margin_value(chat_id: int, stone: str, value: str):
+    column = f"margin_{stone}"
+    async with connection() as db:
+        await db.execute(
+            f"""
+            INSERT INTO user_settings(chat_id, {column})
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET {column} = excluded.{column}
+            """,
+            (chat_id, value),
+        )
+        await db.commit()
+
 # ─── далее продолжается остальной код ────────────────────────
 
 async def set_stone_price(chat_id: int, value: str):
@@ -862,7 +930,6 @@ async def menu3_km_input(message: Message, state: FSMContext):
     menu3_id   = data.get("menu3_message_id")
     menu_id    = data.get("menu_message_id")
     prompt_id  = data.get("prompt_id")
-    stone      = data.get("stone")
     text       = message.text.strip()
     if not text.isdigit():
         return await message.reply("Неверный формат. Введите целое число, например: 10")
@@ -961,6 +1028,7 @@ async def menu3_margin_input(message: Message, state: FSMContext):
     menu3_id   = data.get("menu3_message_id")
     menu_id    = data.get("menu_message_id")
     prompt_id  = data.get("prompt_id")
+    stone      = data.get("stone")
     text       = message.text.strip()
     if not text.isdigit() or not (0 <= int(text) <= 100):
         return await message.reply("Неверный формат. Введите целое число от 0 до 100.")
@@ -2093,7 +2161,7 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
             f"{fmt_price(price_inst_takel)} × {fmt_num(inst_val_ctp + inst_val_wall)} = {fmt_cost(takelage_cost)} ₽\n"
         ]
     else:
-        inst_log += [f"• Такелаж: нет → 0 ₽\n"]
+        inst_log += ["• Такелаж: нет → 0 ₽\n"]
 
     inst_log += [
         "────────────────────────────────\n",
