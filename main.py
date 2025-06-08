@@ -1039,7 +1039,10 @@ async def salary_stone_choice(call: CallbackQuery, state: FSMContext):
     role, stone = data["role"], call.data.split("_")[2]
     await state.set_state(Settings.salary_stone)
     await state.update_data(stone=stone)
-    unit = await get_unit(call.message.chat.id)
+    if role == "master":
+        unit = await get_master_unit(call.message.chat.id)
+    else:
+        unit = await get_installer_unit(call.message.chat.id)
     # забираем текущие значения
     keys = ["countertop","wall"]
     if role=="master":
