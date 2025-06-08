@@ -28,15 +28,15 @@ python main.py
 ## Main commands
 - `/start` — reset the state and open the main menu.
 - "Единица измерения" — choose units (m² or linear meters).
-- "Система налогов" — input your tax percentage.
+- "Система налогов" — configure tax percentages separately for quartz and acrylic.
 - "Стоимость замеров" — configure fixed price and per‑kilometer price for measurements.
-- "МОП" — set overhead percentage.
-- "Маржа" — set profit margin.
+- "МОП" — set overhead percentage separately for quartz and acrylic.
+- "Маржа" — set profit margin separately for quartz and acrylic.
 - "ЗП Мастера" / "ЗП Монтажника" — set wages for each role. Installer delivery now has fixed and per‑kilometer components, editable from this menu.
 - "Далее" opens extra menus to provide dimensions, material prices and other values.
 - "Рассчитать" — receive a detailed breakdown of material cost and salaries.
 
-The bot uses inline keyboards for navigation. After adjusting all parameters, press "Рассчитать" to see the final calculation.
+The bot uses inline keyboards for navigation. After adjusting all parameters, press "Рассчитать" to see the final calculation. Taxes, overhead (МОП) and margin are stored separately for quartz and acrylic, and the calculation applies the values for the stone selected in menu 2.
 
 
 ## License

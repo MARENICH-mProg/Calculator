@@ -58,9 +58,11 @@ class Settings(StatesGroup):
     menu3_km = State()  # ввод «Сколько КМ?»
     menu3_mop = State()  # ввод «проценты МОПу»
     menu3_margin = State()  # ввод «маржа»
+
     tax_stone    = State()  # выбор камня для налогов
     mop_stone    = State()  # выбор камня для МОП
     margin_stone = State()  # выбор камня для маржи
+
 
 # ─── 2) Инициализация базы ────────────────────────────────────
 async def init_db():
@@ -71,6 +73,12 @@ async def init_db():
                 chat_id                   INTEGER PRIMARY KEY,
                 unit                      TEXT    DEFAULT 'не выбрано',
                 tax_percent               TEXT    DEFAULT 'не указано',
+                tax_acryl                 TEXT    DEFAULT 'не указано',
+                tax_quartz                TEXT    DEFAULT 'не указано',
+                mop_acryl                 TEXT    DEFAULT 'не указано',
+                mop_quartz                TEXT    DEFAULT 'не указано',
+                margin_acryl              TEXT    DEFAULT 'не указано',
+                margin_quartz             TEXT    DEFAULT 'не указано',
                 measurement_fix           TEXT    DEFAULT 'не указано',
                 measurement_km            TEXT    DEFAULT 'не указано',
                 master_unit               TEXT    DEFAULT 'не выбрано',
@@ -92,6 +100,17 @@ async def init_db():
         # 2) Узнаём, какие колонки уже есть
         cursor = await db.execute("PRAGMA table_info(user_settings)")
         cols = [row[1] for row in await cursor.fetchall()]
+
+        # 2a) Добавляем новые колонки для налогов, МОП и маржи по типам камня
+        for col in (
+            "tax_acryl", "tax_quartz",
+            "mop_acryl", "mop_quartz",
+            "margin_acryl", "margin_quartz",
+        ):
+            if col not in cols:
+                await db.execute(
+                    f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'"
+                )
 
         # 3) Обязательно добавляем measurement-колонки
         for col in ("measurement_fix", "measurement_km"):
@@ -158,7 +177,24 @@ async def init_db():
         # ─── добавляем колонки для меню 3 ────────────────────────
         for col in ("menu3_km", "menu3_mop", "menu3_margin"):
             if col not in cols:
-                await db.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'")
+                await db.execute(
+                    f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'"
+                )
+
+        # ─── колонки с процентами для каждого типа камня ─────────
+        pct_cols = [
+            "margin_acryl",
+            "margin_quartz",
+            "mop_acryl",
+            "mop_quartz",
+            "tax_acryl",
+            "tax_quartz",
+        ]
+        for col in pct_cols:
+            if col not in cols:
+                await db.execute(
+                    f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'"
+                )
 
         # дополнительные колонки для налогов/МОП/маржи по камням
         for col in (
@@ -245,6 +281,30 @@ async def set_tax(chat_id: int, value: str):
             VALUES (?, ?)
             ON CONFLICT(chat_id) DO UPDATE SET tax_percent = excluded.tax_percent
         """, (chat_id, value))
+        await db.commit()
+
+async def get_tax_percent(chat_id: int, stone: str) -> str:
+    column = "tax_acryl" if stone == "acryl" else "tax_quartz"
+    async with connection() as db:
+        cur = await db.execute(
+            f"SELECT {column} FROM user_settings WHERE chat_id = ?",
+            (chat_id,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else "не указано"
+
+
+async def set_tax_percent(chat_id: int, stone: str, value: str):
+    column = "tax_acryl" if stone == "acryl" else "tax_quartz"
+    async with connection() as db:
+        await db.execute(
+            f"""
+            INSERT INTO user_settings(chat_id, {column})
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET {column} = excluded.{column}
+            """,
+            (chat_id, value),
+        )
         await db.commit()
 
 async def get_measurement_fix(chat_id: int) -> str:
@@ -515,6 +575,7 @@ async def set_menu3_margin(chat_id: int, value: str):
         """, (chat_id, value))
         await db.commit()
 
+
 # ─── новые функции для налогов/МОП/маржи по типу камня ───────────
 async def get_tax_value(chat_id: int, stone: str) -> str:
     column = f"tax_{stone}"
@@ -525,6 +586,7 @@ async def get_tax_value(chat_id: int, stone: str) -> str:
 
 async def set_tax_value(chat_id: int, stone: str, value: str):
     column = f"tax_{stone}"
+
     async with connection() as db:
         await db.execute(
             f"""
@@ -535,6 +597,7 @@ async def set_tax_value(chat_id: int, stone: str, value: str):
             (chat_id, value),
         )
         await db.commit()
+
 
 async def get_mop_value(chat_id: int, stone: str) -> str:
     column = f"mop_{stone}"
@@ -565,6 +628,7 @@ async def get_margin_value(chat_id: int, stone: str) -> str:
 
 async def set_margin_value(chat_id: int, stone: str, value: str):
     column = f"margin_{stone}"
+
     async with connection() as db:
         await db.execute(
             f"""
@@ -2048,15 +2112,17 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     ]
 
     # ─── 6) Итоговая стоимость для клиента ─────────────────────────
+
     # читаем проценты с учётом выбранного камня
     raw_margin = await get_margin_value(chat_id, stone_key)
     raw_mop    = await get_mop_value(chat_id, stone_key)
     raw_tax    = await get_tax_value(chat_id, stone_key)
 
+
     # преобразуем к float, если не указано — 0
-    margin = float(raw_margin) if raw_margin.isdigit() else 0.0
-    mop = float(raw_mop) if raw_mop.isdigit() else 0.0
-    tax = float(raw_tax) if raw_tax.isdigit() else 0.0
+    margin = to_float_zero(raw_margin)
+    mop = to_float_zero(raw_mop)
+    tax = to_float_zero(raw_tax)
 
     total_pct = margin + mop + tax  # суммарный %
     # защищаемся от деления на ноль
