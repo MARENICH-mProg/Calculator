@@ -9,10 +9,24 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import (CallbackQuery, InlineKeyboardButton,
-                           InlineKeyboardMarkup, Message)
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
+from aiogram.exceptions import TelegramBadRequest
 
 API_TOKEN = "7908411125:AAFxJdhRYxke3mLVRa4Gxxy1Ow2dNk4Sf5w"
+
+
+async def safe_edit_message_text(func, *args, **kwargs):
+    """Edit message text and ignore 'message is not modified' errors."""
+    try:
+        await func(*args, **kwargs)
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            raise
 
 
 
@@ -673,7 +687,7 @@ async def to_menu3(call: CallbackQuery, state: FSMContext):
     km_current  = await get_menu3_km(call.message.chat.id)
     takel_current = await get_menu2_takelage(call.message.chat.id)
 
-    await call.message.edit_text(
+    await safe_edit_message_text(call.message.edit_text, 
         "Логистика:",
         reply_markup=menu3_kb(km_current, takel_current)
     )
@@ -705,7 +719,7 @@ async def menu3_km_input(message: Message, state: FSMContext):
         await state.set_state(Settings.menu3)
         km_current  = await get_menu3_km(message.chat.id)
         takel_current = await get_menu2_takelage(message.chat.id)
-        await message.bot.edit_message_text(
+        await safe_edit_message_text(message.bot.edit_message_text, 
             text="Логистика:",
             chat_id=message.chat.id,
             message_id=menu3_id,
@@ -718,7 +732,7 @@ async def menu3_km_input(message: Message, state: FSMContext):
         km   = await get_measurement_km(message.chat.id)
         mop  = await get_menu3_mop(message.chat.id)
         margin = await get_menu3_margin(message.chat.id)
-        await message.bot.edit_message_text(
+        await safe_edit_message_text(message.bot.edit_message_text, 
             text="Параметры:",
             chat_id=message.chat.id,
             message_id=menu_id,
@@ -751,7 +765,7 @@ async def menu3_mop_input(message: Message, state: FSMContext):
         await state.set_state(Settings.menu3)
         km_current  = await get_menu3_km(message.chat.id)
         takel_current = await get_menu2_takelage(message.chat.id)
-        await message.bot.edit_message_text(
+        await safe_edit_message_text(message.bot.edit_message_text, 
             text="Логистика:",
             chat_id=message.chat.id,
             message_id=menu3_id,
@@ -764,7 +778,7 @@ async def menu3_mop_input(message: Message, state: FSMContext):
         km   = await get_measurement_km(message.chat.id)
         mop  = await get_menu3_mop(message.chat.id)
         margin = await get_menu3_margin(message.chat.id)
-        await message.bot.edit_message_text(
+        await safe_edit_message_text(message.bot.edit_message_text, 
             text="Параметры:",
             chat_id=message.chat.id,
             message_id=menu_id,
@@ -799,7 +813,7 @@ async def menu3_margin_input(message: Message, state: FSMContext):
         await state.set_state(Settings.menu3)
         km_current = await get_menu3_km(message.chat.id)
         takel_current = await get_menu2_takelage(message.chat.id)
-        await message.bot.edit_message_text(
+        await safe_edit_message_text(message.bot.edit_message_text, 
             text="Логистика:",
             chat_id=message.chat.id,
             message_id=menu3_id,
@@ -812,7 +826,7 @@ async def menu3_margin_input(message: Message, state: FSMContext):
         km = await get_measurement_km(message.chat.id)
         mop = await get_menu3_mop(message.chat.id)
         margin = await get_menu3_margin(message.chat.id)
-        await message.bot.edit_message_text(
+        await safe_edit_message_text(message.bot.edit_message_text, 
             text="Параметры:",
             chat_id=message.chat.id,
             message_id=menu_id,
@@ -841,7 +855,7 @@ async def back_to_menu2(call: CallbackQuery, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
-    await call.message.edit_text(
+    await safe_edit_message_text(call.message.edit_text, 
         "Основное меню 2:",
         reply_markup=menu2_kb(
             current_stone, current_price,
@@ -862,7 +876,7 @@ async def set_unit_menu(call: CallbackQuery, state: FSMContext):
             InlineKeyboardButton(text="м/п", callback_data="unit_mp"),
         ]
     ])
-    await call.message.edit_text("Выберите единицу измерения:", reply_markup=kb)
+    await safe_edit_message_text(call.message.edit_text, "Выберите единицу измерения:", reply_markup=kb)
     await call.answer()
 
 
@@ -879,7 +893,7 @@ async def unit_choice(call: CallbackQuery, state: FSMContext):
     km  = await get_measurement_km(call.message.chat.id)
     mop = await get_menu3_mop(call.message.chat.id)
     margin = await get_menu3_margin(call.message.chat.id)
-    await call.message.bot.edit_message_text(
+    await safe_edit_message_text(call.message.bot.edit_message_text, 
         text="Параметры:",
         chat_id=call.message.chat.id,
         message_id=menu_id,
@@ -925,7 +939,7 @@ async def tax_input(message: Message, state: FSMContext):
     km  = await get_measurement_km(message.chat.id)
     mop = await get_menu3_mop(message.chat.id)
     margin = await get_menu3_margin(message.chat.id)
-    await message.bot.edit_message_text(
+    await safe_edit_message_text(message.bot.edit_message_text, 
         text="Параметры:",
         chat_id=message.chat.id,
         message_id=menu_id,
@@ -937,7 +951,7 @@ async def set_measurement_menu(call: CallbackQuery, state: FSMContext):
     await state.update_data(menu_message_id=call.message.message_id)
     fix = await get_measurement_fix(call.message.chat.id)
     km  = await get_measurement_km(call.message.chat.id)
-    await call.message.edit_text("Введите стоимость выезда:", reply_markup=meas_submenu(fix, km))
+    await safe_edit_message_text(call.message.edit_text, "Введите стоимость выезда:", reply_markup=meas_submenu(fix, km))
     await call.answer()
 
 async def meas_fix_menu(call: CallbackQuery, state: FSMContext):
@@ -963,7 +977,7 @@ async def meas_back(call: CallbackQuery, state: FSMContext):
     km   = await get_measurement_km(call.message.chat.id)
     mop  = await get_menu3_mop(call.message.chat.id)
     margin = await get_menu3_margin(call.message.chat.id)
-    await call.message.edit_text("Параметры:", reply_markup=main_menu(tax, fix, km, mop, margin))
+    await safe_edit_message_text(call.message.edit_text, "Параметры:", reply_markup=main_menu(tax, fix, km, mop, margin))
     await call.answer()
 
 async def meas_fix_input(message: Message, state: FSMContext):
@@ -980,7 +994,7 @@ async def meas_fix_input(message: Message, state: FSMContext):
     await state.set_state(Settings.meas_menu)
     fix = await get_measurement_fix(message.chat.id)
     km  = await get_measurement_km(message.chat.id)
-    await message.bot.edit_message_text(
+    await safe_edit_message_text(message.bot.edit_message_text, 
         text="Введите стоимость выезда:",
         chat_id=message.chat.id,
         message_id=menu_id,
@@ -1001,7 +1015,7 @@ async def price_inst_deliv_km_input(message: Message, state: FSMContext):
     await state.set_state(Settings.meas_menu)
     fix = await get_measurement_fix(message.chat.id)
     km  = await get_measurement_km(message.chat.id)
-    await message.bot.edit_message_text(
+    await safe_edit_message_text(message.bot.edit_message_text, 
         text="Введите стоимость выезда:",
         chat_id=message.chat.id,
         message_id=menu_id,
@@ -1027,7 +1041,7 @@ async def salary_role_menu(call: CallbackQuery, state: FSMContext):
     role = call.data.split("_")[1]      # -> "master" или "installer"
     await state.set_state(Settings.salary_role)
     await state.update_data(menu_message_id=call.message.message_id, role=role)
-    await call.message.edit_text(
+    await safe_edit_message_text(call.message.edit_text, 
         "Выберите тип камня:",
         reply_markup=stone_menu_kb(role)
     )
@@ -1051,7 +1065,7 @@ async def salary_stone_choice(call: CallbackQuery, state: FSMContext):
         keys += ["delivery","delivery_km","takelage"]
     values = {k: await get_salary(call.message.chat.id, f"master_{stone}_{k}" if role=="master" else f"installer_{stone}_{k}")
               for k in keys}
-    await call.message.edit_text(
+    await safe_edit_message_text(call.message.edit_text, 
         f"Установки для { 'акрилового' if stone=='acryl' else 'кварцевого' } камня:",
         reply_markup=salary_item_kb(role, stone, unit, values)
     )
@@ -1065,7 +1079,7 @@ async def salary_stone_back(call: CallbackQuery, state: FSMContext):
     km   = await get_measurement_km(call.message.chat.id)
     mop  = await get_menu3_mop(call.message.chat.id)
     margin = await get_menu3_margin(call.message.chat.id)
-    await call.message.edit_text(
+    await safe_edit_message_text(call.message.edit_text, 
         "Параметры:",
         reply_markup=main_menu(tax, fix, km, mop, margin)
     )
@@ -1134,7 +1148,7 @@ async def salary_item_input(message: Message, state: FSMContext):
     # заново собрать values как в B)
     keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery","delivery_km","takelage"])
     values = {k: await get_salary(message.chat.id, f"{role}_{stone}_{k}") for k in keys}
-    await message.bot.edit_message_text(
+    await safe_edit_message_text(message.bot.edit_message_text, 
         text=f"Установки для { 'акрилового' if stone=='acryl' else 'кварцевого' } камня:",
         chat_id=message.chat.id,
         message_id=menu_id,
@@ -1175,7 +1189,7 @@ async def salary_unit_choice(call: CallbackQuery, state: FSMContext):
     keys = ["countertop","wall"] + (["boil","sink","glue","edges"] if role=="master" else ["delivery","delivery_km","takelage"])
     values = {k: await get_salary(chat_id, f"{role}_{stone}_{k}") for k in keys}
     unit = choice
-    await call.message.bot.edit_message_text(
+    await safe_edit_message_text(call.message.bot.edit_message_text, 
         text=f"Установки для { 'акрилового' if stone=='acryl' else 'кварцевого' } камня:",
         chat_id=chat_id,
         message_id=menu_id,
@@ -1207,7 +1221,7 @@ async def to_menu2(call: CallbackQuery, state: FSMContext):
     gl             = await get_menu2_glue(chat_id)
     ed             = await get_menu2_value(chat_id, "edges", "м/п")
 
-    await call.message.edit_text(
+    await safe_edit_message_text(call.message.edit_text, 
         "Основное меню 2:",
         reply_markup=menu2_kb(
             current_stone, current_price,
@@ -1224,7 +1238,7 @@ async def first_stone_choice(call: CallbackQuery, state: FSMContext):
     # Сохраняем ID сообщения, чтобы потом вернуться
     data = await state.get_data()
     await state.update_data(menu2_message_id=data["menu2_message_id"])
-    await call.message.edit_text(
+    await safe_edit_message_text(call.message.edit_text, 
         "Выберите тип камня:",
         reply_markup=first_stone_kb()
     )
@@ -1253,7 +1267,7 @@ async def stone2_selected(call: CallbackQuery, state: FSMContext):
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
 
-    await call.message.edit_text(
+    await safe_edit_message_text(call.message.edit_text, 
         "Основное меню 2:",
         reply_markup=menu2_kb(
             selected,           # тип камня
@@ -1308,7 +1322,7 @@ async def stone_price_input(message: Message, state: FSMContext):
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
 
-    await message.bot.edit_message_text(
+    await safe_edit_message_text(message.bot.edit_message_text, 
         text="Основное меню 2:",
         chat_id=chat_id,
         message_id=menu2_id,
@@ -1329,7 +1343,7 @@ async def back_to_main(call: CallbackQuery, state: FSMContext):
     km   = await get_measurement_km(call.message.chat.id)
     mop  = await get_menu3_mop(call.message.chat.id)
     margin = await get_menu3_margin(call.message.chat.id)
-    await call.message.edit_text(
+    await safe_edit_message_text(call.message.edit_text, 
         "Привет! Настройте параметры:",
         reply_markup=main_menu(tax, fix, km, mop, margin)
     )
@@ -1358,7 +1372,7 @@ async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
         chat_id = call.message.chat.id
         m2_val = await get_menu2_value(chat_id, "countertop", "м2")
         mp_val = await get_menu2_value(chat_id, "countertop", "м/п")
-        await call.message.edit_text(
+        await safe_edit_message_text(call.message.edit_text, 
             "Вы нажали \u00abСтолешница\u00bb, введите значение для каждой единицы измерения.",
             reply_markup=countertop_submenu(m2_val, mp_val),
         )
@@ -1370,7 +1384,7 @@ async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
         chat_id = call.message.chat.id
         m2_val = await get_menu2_value(chat_id, "wall", "м2")
         mp_val = await get_menu2_value(chat_id, "wall", "м/п")
-        await call.message.edit_text(
+        await safe_edit_message_text(call.message.edit_text, 
             "Вы нажали \u00abСтеновая\u00bb, введите значение для каждой единицы измерения.",
             reply_markup=wall_submenu(m2_val, mp_val),
         )
@@ -1446,7 +1460,7 @@ async def countertop_value_input(message: Message, state: FSMContext):
 
     m2_val = await get_menu2_value(message.chat.id, "countertop", "м2")
     mp_val = await get_menu2_value(message.chat.id, "countertop", "м/п")
-    await message.bot.edit_message_text(
+    await safe_edit_message_text(message.bot.edit_message_text, 
         text="Вы нажали \u00abСтолешница\u00bb, введите значение для каждой единицы измерения.",
         chat_id=message.chat.id,
         message_id=menu2_id,
@@ -1490,7 +1504,7 @@ async def wall_value_input(message: Message, state: FSMContext):
 
     m2_val = await get_menu2_value(message.chat.id, "wall", "м2")
     mp_val = await get_menu2_value(message.chat.id, "wall", "м/п")
-    await message.bot.edit_message_text(
+    await safe_edit_message_text(message.bot.edit_message_text, 
         text="Вы нажали \u00abСтеновая\u00bb, введите значение для каждой единицы измерения.",
         chat_id=message.chat.id,
         message_id=menu2_id,
@@ -1521,7 +1535,7 @@ async def countertop_back(call: CallbackQuery, state: FSMContext):
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
 
-    await call.message.edit_text(
+    await safe_edit_message_text(call.message.edit_text, 
         "Основное меню 2:",
         reply_markup=menu2_kb(
             current_stone, current_price,
@@ -1553,7 +1567,7 @@ async def wall_back(call: CallbackQuery, state: FSMContext):
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
 
-    await call.message.edit_text(
+    await safe_edit_message_text(call.message.edit_text, 
         "Основное меню 2:",
         reply_markup=menu2_kb(
             current_stone, current_price,
@@ -1636,7 +1650,7 @@ async def menu2_item_input(message: Message, state: FSMContext):
     # Для бортиков всегда используем значение в м/п независимо от выбранной
     # единицы измерения меню.
     ed   = await get_menu2_value(message.chat.id, "edges", "м/п")
-    await message.bot.edit_message_text(
+    await safe_edit_message_text(message.bot.edit_message_text, 
         text="Основное меню 2:",
         chat_id=message.chat.id,
         message_id=menu2_id,
@@ -1668,7 +1682,7 @@ async def menu3_takelage_input(call: CallbackQuery, state: FSMContext):
         await call.message.bot.delete_message(chat_id=chat_id, message_id=prompt_id)
 
     # Перерисовываем меню 3
-    await call.message.bot.edit_message_text(
+    await safe_edit_message_text(call.message.bot.edit_message_text, 
         "Логистика:",
         reply_markup=menu3_kb(km_current, choice),
         chat_id=chat_id,
@@ -1708,7 +1722,7 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
         f"Итого материал: {fmt_num(material_cost)} ₽",
     ]
     # заменяем текст меню 3 на лог материала
-    await call.message.edit_text("\n".join(material_log))
+    await safe_edit_message_text(call.message.edit_text, "\n".join(material_log))
 
     # ─── 2) Расчёт ЗП мастера ───────────────────────────────────────
     # 2.1) Какой камень
