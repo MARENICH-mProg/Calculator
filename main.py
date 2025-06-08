@@ -578,7 +578,7 @@ def salary_item_kb(role: str, stone: str, unit: str, values: dict[str,str]) -> I
             InlineKeyboardButton(text=f"Вырез мойка | {values['sink']}",      callback_data=f"salary_{role}_{stone}_sink")
         ],[
             InlineKeyboardButton(text=f"Подклейка | {values['glue']}",         callback_data=f"salary_{role}_{stone}_glue"),
-            InlineKeyboardButton(text=f"Бортики | {values['edges']} | {unit}", callback_data=f"salary_{role}_{stone}_edges")
+            InlineKeyboardButton(text=f"Бортики | {values['edges']} | м/п", callback_data=f"salary_{role}_{stone}_edges")
         ]]
     else:  # installer
         kb += [[
@@ -623,7 +623,7 @@ def menu2_kb(stone: str, price: str,
         ],
         [
           InlineKeyboardButton(text=f"Подклейка | {gl} шт",         callback_data="menu2_glue"),
-          InlineKeyboardButton(text=f"Бортики | {ed} | {unit}",    callback_data="menu2_edges"),
+          InlineKeyboardButton(text=f"Бортики | {ed} | м/п",    callback_data="menu2_edges"),
         ],
         # *** новая строка с кнопкой «Такелаж» ***
         [InlineKeyboardButton(text=f"Такелаж | {tak}",              callback_data="menu2_takelage")],
@@ -851,7 +851,7 @@ async def back_to_menu2(call: CallbackQuery, state: FSMContext):
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
-    ed   = await get_menu2_value(chat_id, "edges", unit)
+    ed   = await get_menu2_value(chat_id, "edges", "м/п")
     tak  = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
@@ -1099,8 +1099,9 @@ async def salary_item_menu(call: CallbackQuery, state: FSMContext):
         msg = await call.message.answer("Введите фиксированную стоимость доставки (₽):")
         await state.update_data(prompt_id=msg.message_id, substep="fix")
     else:
+        unit_hint = 'м/п' if item == 'edges' else ('м2' if item in ['countertop','wall','takelage'] else 'шт.')
         msg = await call.message.answer(
-            f"Введите сумму для {label} ({'м2' if item in ['countertop','wall','edges','takelage'] else 'шт.'}):"
+            f"Введите сумму для {label} ({unit_hint}):"
         )
         await state.update_data(prompt_id=msg.message_id)
     await call.answer()
@@ -1215,7 +1216,7 @@ async def to_menu2(call: CallbackQuery, state: FSMContext):
     bo             = await get_menu2_boil(chat_id)
     si             = await get_menu2_sink(chat_id)
     gl             = await get_menu2_glue(chat_id)
-    ed             = await get_menu2_value(chat_id, "edges", unit)
+    ed             = await get_menu2_value(chat_id, "edges", "м/п")
     tak            = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
@@ -1263,7 +1264,7 @@ async def stone2_selected(call: CallbackQuery, state: FSMContext):
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
-    ed   = await get_menu2_value(chat_id, "edges", unit)
+    ed   = await get_menu2_value(chat_id, "edges", "м/п")
     tak  = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
@@ -1320,7 +1321,7 @@ async def stone_price_input(message: Message, state: FSMContext):
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
-    ed   = await get_menu2_value(chat_id, "edges", unit)
+    ed   = await get_menu2_value(chat_id, "edges", "м/п")
     tak  = await get_menu2_takelage(chat_id)
 
     await message.bot.edit_message_text(
@@ -1393,17 +1394,12 @@ async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
         await call.answer()
         return
     if key == "menu2_edges":
-
-        await state.set_state(Settings.menu2_item_unit)
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(text="м2",   callback_data="menu2_unit_m2"),
-                InlineKeyboardButton(text="м/п", callback_data="menu2_unit_mp"),
-            ]
-        ])
-        await call.message.answer(
-            f"Введите значение для {label}: выберите единицу", reply_markup=kb
+        await state.set_state(Settings.menu2_item)
+        await state.update_data(measure_type="mp")
+        msg = await call.message.answer(
+            f"Введите значение для {label} (м/п):"
         )
+        await state.update_data(prompt_id=msg.message_id)
     else:
         await state.set_state(Settings.menu2_item)
         unit_type = "шт"
@@ -1540,7 +1536,7 @@ async def countertop_back(call: CallbackQuery, state: FSMContext):
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
-    ed   = await get_menu2_value(chat_id, "edges", unit)
+    ed   = await get_menu2_value(chat_id, "edges", "м/п")
     tak  = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
@@ -1574,7 +1570,7 @@ async def wall_back(call: CallbackQuery, state: FSMContext):
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
-    ed   = await get_menu2_value(chat_id, "edges", unit)
+    ed   = await get_menu2_value(chat_id, "edges", "м/п")
     tak  = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
@@ -1700,7 +1696,7 @@ async def menu2_takelage_input(call: CallbackQuery, state: FSMContext):
     bo   = await get_menu2_boil(chat_id)
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
-    ed   = await get_menu2_value(chat_id, "edges", unit)
+    ed   = await get_menu2_value(chat_id, "edges", "м/п")
     tak  = choice  # «да» или «нет»
 
     # Удаляем сообщение с кнопками
@@ -1786,7 +1782,7 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
     raw_val_boil  = await get_menu2_boil(chat_id)
     raw_val_sink  = await get_menu2_sink(chat_id)
     raw_val_glue  = await get_menu2_glue(chat_id)
-    raw_val_edges = await get_menu2_value(chat_id, "edges", master_unit)
+    raw_val_edges = await get_menu2_value(chat_id, "edges", "м/п")
 
     def parse_area(v: str) -> float:
         return float(v) if v.replace(".", "", 1).isdigit() else 0.0
@@ -1844,8 +1840,8 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
         f"количество = {val_glue} шт → "
         f"{fmt_price(price_glue)} × {val_glue} = {fmt_cost(cost_glue)} ₽\n",
         f"• Бортики:\n"
-        f"    цена мастера за {master_unit} = {fmt_price(price_edges)} ₽, "
-        f"длина = {disp(raw_val_edges)} {master_unit} → "
+        f"    цена мастера за м/п = {fmt_price(price_edges)} ₽, "
+        f"длина = {disp(raw_val_edges)} м/п → "
         f"{fmt_price(price_edges)} × {disp(raw_val_edges)} = {fmt_cost(cost_edges)} ₽\n",
         "────────────────────────────────\n",
         f"Итого ЗП мастера: {fmt_cost(total_master)} ₽"
