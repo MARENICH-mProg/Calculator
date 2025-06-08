@@ -881,17 +881,9 @@ async def start_handler(message: Message, state: FSMContext):
     # Сбросим любое текущее состояние
     await state.clear()
 
-    tax_q = await get_tax_percent(message.chat.id, "quartz")
-    tax_a = await get_tax_percent(message.chat.id, "acryl")
-    tax_value = f"Кварц {tax_q}% | Акрил {tax_a}%"
-
-    mop_q = await get_mop_percent(message.chat.id, "quartz")
-    mop_a = await get_mop_percent(message.chat.id, "acryl")
-    mop_value = f"Кварц {mop_q}% | Акрил {mop_a}%"
-
-    margin_q = await get_margin_percent(message.chat.id, "quartz")
-    margin_a = await get_margin_percent(message.chat.id, "acryl")
-    margin_value = f"Кварц {margin_q}% | Акрил {margin_a}%"
+    tax_value = await get_tax(message.chat.id)
+    mop_value = await get_menu3_mop(message.chat.id)
+    margin_value = await get_menu3_margin(message.chat.id)
 
     fix = await get_measurement_fix(message.chat.id)
     km  = await get_measurement_km(message.chat.id)
