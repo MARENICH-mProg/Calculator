@@ -58,6 +58,9 @@ class Settings(StatesGroup):
     menu3_km = State()  # ввод «Сколько КМ?»
     menu3_mop = State()  # ввод «проценты МОПу»
     menu3_margin = State()  # ввод «маржа»
+    tax_stone = State()
+    mop_stone = State()
+    margin_stone = State()
 
 # ─── 2) Инициализация базы ────────────────────────────────────
 async def init_db():
