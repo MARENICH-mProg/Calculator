@@ -68,6 +68,12 @@ async def init_db():
                 chat_id                   INTEGER PRIMARY KEY,
                 unit                      TEXT    DEFAULT 'не выбрано',
                 tax_percent               TEXT    DEFAULT 'не указано',
+                tax_acryl                 TEXT    DEFAULT 'не указано',
+                tax_quartz                TEXT    DEFAULT 'не указано',
+                mop_acryl                 TEXT    DEFAULT 'не указано',
+                mop_quartz                TEXT    DEFAULT 'не указано',
+                margin_acryl              TEXT    DEFAULT 'не указано',
+                margin_quartz             TEXT    DEFAULT 'не указано',
                 measurement_fix           TEXT    DEFAULT 'не указано',
                 measurement_km            TEXT    DEFAULT 'не указано',
                 master_unit               TEXT    DEFAULT 'не выбрано',
@@ -89,6 +95,17 @@ async def init_db():
         # 2) Узнаём, какие колонки уже есть
         cursor = await db.execute("PRAGMA table_info(user_settings)")
         cols = [row[1] for row in await cursor.fetchall()]
+
+        # 2a) Добавляем новые колонки для налогов, МОП и маржи по типам камня
+        for col in (
+            "tax_acryl", "tax_quartz",
+            "mop_acryl", "mop_quartz",
+            "margin_acryl", "margin_quartz",
+        ):
+            if col not in cols:
+                await db.execute(
+                    f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'"
+                )
 
         # 3) Обязательно добавляем measurement-колонки
         for col in ("measurement_fix", "measurement_km"):
