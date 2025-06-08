@@ -38,7 +38,7 @@ class Settings(StatesGroup):
     wall_menu = State()  # подменю стеновой с выбором м2/м/п
     wall_input = State()  # ввод значения стеновой для выбранной единицы
 
-    menu2_takelage = State()  # *** новое состояние для выбора «такелаж» ***
+    menu3_takelage = State()  # состояние выбора «такелаж» в логистике
     # ─── добавляем подменю 3 ────────────────────────────────
     menu3 = State()  # сам экран «меню 3»
     menu3_km = State()  # ввод «Сколько КМ?»
@@ -428,11 +428,11 @@ async def set_menu2_takelage(chat_id: int, value: str):
         """, (chat_id, value))
         await db.commit()
 
-async def menu2_takelage_menu(call: CallbackQuery, state: FSMContext):
-    # 1) Переводим FSM в состояние Settings.menu2_takelage
-    await state.set_state(Settings.menu2_takelage)
+async def menu3_takelage_menu(call: CallbackQuery, state: FSMContext):
+    # 1) Переводим FSM в состояние Settings.menu3_takelage
+    await state.set_state(Settings.menu3_takelage)
     data = await state.get_data()
-    await state.update_data(menu2_message_id=data["menu2_message_id"])
+    await state.update_data(menu3_message_id=data["menu3_message_id"])
 
     # 2) Показываем юзеру две кнопки «Да» / «Нет»
     msg = await call.message.answer(
@@ -596,9 +596,9 @@ def salary_item_kb(role: str, stone: str, unit: str, values: dict[str,str]) -> I
 # ─── Новый блок: меню 2 ──────────────────────────────────────
 def menu2_kb(stone: str, price: str,
              cntp: str, wal: str, bo: str, si: str, gl: str, ed: str,
-             tak: str, unit: str) -> InlineKeyboardMarkup:
+             unit: str) -> InlineKeyboardMarkup:
     """
-    Теперь menu2_kb получает 10 аргументов:
+    Теперь menu2_kb получает 9 аргументов:
     1) stone  – выбранный тип камня
     2) price  – цена за камень
     3) cntp   – Столешница
@@ -607,8 +607,7 @@ def menu2_kb(stone: str, price: str,
     6) si     – Вырез мойка
     7) gl     – Подклейка
     8) ed     – Бортики
-    9) tak    – Такелаж ("да" или "нет" или "не указано")
-    10) unit  – единица измерения ("м2"/"м/п")
+    9) unit  – единица измерения ("м2"/"м/п")
     """
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"Тип камня | {stone}",        callback_data="set_first_stone")],
@@ -625,11 +624,8 @@ def menu2_kb(stone: str, price: str,
           InlineKeyboardButton(text=f"Подклейка | {gl} шт",         callback_data="menu2_glue"),
           InlineKeyboardButton(text=f"Бортики | {ed} | м/п",    callback_data="menu2_edges"),
         ],
-        # *** новая строка с кнопкой «Такелаж» ***
-        [InlineKeyboardButton(text=f"Такелаж | {tak}",              callback_data="menu2_takelage")],
-
         # далее оставшиеся кнопки:
-        [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu3")],
+        [InlineKeyboardButton(text="Логистика", callback_data="to_menu3")],
         [InlineKeyboardButton(text="← Назад", callback_data="back_to_main")],
     ])
 
@@ -641,17 +637,14 @@ def first_stone_kb() -> InlineKeyboardMarkup:
     ])
 
 
-def menu3_kb(km: str, mop: str, margin: str) -> InlineKeyboardMarkup:
-    """
-    km, mop, margin — текущие сохранённые строки («не указано» или уже введённое значение).
-    """
+def menu3_kb(km: str, takel: str) -> InlineKeyboardMarkup:
+    """Кнопки меню «Логистика»"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"Сколько КМ? {km} км",      callback_data="menu3_km")],
-        [InlineKeyboardButton(text=f"проценты МОПу {mop} %",   callback_data="menu3_mop")],
-        [InlineKeyboardButton(text=f"маржа {margin} %",         callback_data="menu3_margin")],
+        [InlineKeyboardButton(text=f"КМ от МКАД | {km}", callback_data="menu3_km")],
+        [InlineKeyboardButton(text=f"Такелаж | {takel}", callback_data="menu3_takelage")],
         [
-            InlineKeyboardButton(text="← Назад",                callback_data="back_to_menu2"),
-            InlineKeyboardButton(text="Рассчитать",            callback_data="calculate")
+            InlineKeyboardButton(text="← Назад", callback_data="back_to_menu2"),
+            InlineKeyboardButton(text="Рассчитать", callback_data="calculate")
         ],
     ])
 
@@ -677,13 +670,12 @@ async def to_menu3(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.menu3)
     await state.update_data(menu3_message_id=call.message.message_id)
 
-    km_current     = await get_menu3_km(call.message.chat.id)
-    mop_current    = await get_menu3_mop(call.message.chat.id)
-    margin_current = await get_menu3_margin(call.message.chat.id)
+    km_current  = await get_menu3_km(call.message.chat.id)
+    takel_current = await get_menu2_takelage(call.message.chat.id)
 
     await call.message.edit_text(
-        "Основное меню 3:",
-        reply_markup=menu3_kb(km_current, mop_current, margin_current)
+        "Логистика:",
+        reply_markup=menu3_kb(km_current, takel_current)
     )
     await call.answer()
 
@@ -711,14 +703,13 @@ async def menu3_km_input(message: Message, state: FSMContext):
 
     if menu3_id:
         await state.set_state(Settings.menu3)
-        km_current     = await get_menu3_km(message.chat.id)
-        mop_current    = await get_menu3_mop(message.chat.id)
-        margin_current = await get_menu3_margin(message.chat.id)
+        km_current  = await get_menu3_km(message.chat.id)
+        takel_current = await get_menu2_takelage(message.chat.id)
         await message.bot.edit_message_text(
-            text="Основное меню 3:",
+            text="Логистика:",
             chat_id=message.chat.id,
             message_id=menu3_id,
-            reply_markup=menu3_kb(km_current, mop_current, margin_current)
+            reply_markup=menu3_kb(km_current, takel_current)
         )
     else:
         await state.clear()
@@ -758,14 +749,13 @@ async def menu3_mop_input(message: Message, state: FSMContext):
 
     if menu3_id:
         await state.set_state(Settings.menu3)
-        km_current     = await get_menu3_km(message.chat.id)
-        mop_current    = await get_menu3_mop(message.chat.id)
-        margin_current = await get_menu3_margin(message.chat.id)
+        km_current  = await get_menu3_km(message.chat.id)
+        takel_current = await get_menu2_takelage(message.chat.id)
         await message.bot.edit_message_text(
-            text="Основное меню 3:",
+            text="Логистика:",
             chat_id=message.chat.id,
             message_id=menu3_id,
-            reply_markup=menu3_kb(km_current, mop_current, margin_current)
+            reply_markup=menu3_kb(km_current, takel_current)
         )
     else:
         await state.clear()
@@ -808,13 +798,12 @@ async def menu3_margin_input(message: Message, state: FSMContext):
     if menu3_id:
         await state.set_state(Settings.menu3)
         km_current = await get_menu3_km(message.chat.id)
-        mop_current = await get_menu3_mop(message.chat.id)
-        margin_current = await get_menu3_margin(message.chat.id)
+        takel_current = await get_menu2_takelage(message.chat.id)
         await message.bot.edit_message_text(
-            text="Основное меню 3:",
+            text="Логистика:",
             chat_id=message.chat.id,
             message_id=menu3_id,
-            reply_markup=menu3_kb(km_current, mop_current, margin_current),
+            reply_markup=menu3_kb(km_current, takel_current),
         )
     else:
         await state.clear()
@@ -852,14 +841,11 @@ async def back_to_menu2(call: CallbackQuery, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
-    tak  = await get_menu2_takelage(chat_id)
-
     await call.message.edit_text(
         "Основное меню 2:",
         reply_markup=menu2_kb(
             current_stone, current_price,
             cntp, wal, bo, si, gl, ed,
-            tak,
             unit
         )
     )
@@ -1217,14 +1203,12 @@ async def to_menu2(call: CallbackQuery, state: FSMContext):
     si             = await get_menu2_sink(chat_id)
     gl             = await get_menu2_glue(chat_id)
     ed             = await get_menu2_value(chat_id, "edges", "м/п")
-    tak            = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
         "Основное меню 2:",
         reply_markup=menu2_kb(
             current_stone, current_price,
             cntp, wal, bo, si, gl, ed,
-            tak,
             unit
         )
     )
@@ -1265,7 +1249,6 @@ async def stone2_selected(call: CallbackQuery, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
-    tak  = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
         "Основное меню 2:",
@@ -1273,7 +1256,6 @@ async def stone2_selected(call: CallbackQuery, state: FSMContext):
             selected,           # тип камня
             current_price,
             cntp, wal, bo, si, gl, ed,
-            tak,
             unit
         )
     )
@@ -1322,7 +1304,6 @@ async def stone_price_input(message: Message, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
-    tak  = await get_menu2_takelage(chat_id)
 
     await message.bot.edit_message_text(
         text="Основное меню 2:",
@@ -1331,7 +1312,6 @@ async def stone_price_input(message: Message, state: FSMContext):
         reply_markup=menu2_kb(
             current_stone, current_price,
             cntp, wal, bo, si, gl, ed,
-            tak,
             unit
         )
     )
@@ -1537,14 +1517,12 @@ async def countertop_back(call: CallbackQuery, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
-    tak  = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
         "Основное меню 2:",
         reply_markup=menu2_kb(
             current_stone, current_price,
             cntp, wal, bo, si, gl, ed,
-            tak,
             unit,
         ),
     )
@@ -1571,14 +1549,12 @@ async def wall_back(call: CallbackQuery, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
-    tak  = await get_menu2_takelage(chat_id)
 
     await call.message.edit_text(
         "Основное меню 2:",
         reply_markup=menu2_kb(
             current_stone, current_price,
             cntp, wal, bo, si, gl, ed,
-            tak,
             unit,
         ),
     )
@@ -1657,66 +1633,43 @@ async def menu2_item_input(message: Message, state: FSMContext):
     # Для бортиков всегда используем значение в м/п независимо от выбранной
     # единицы измерения меню.
     ed   = await get_menu2_value(message.chat.id, "edges", "м/п")
-    tak = await get_menu2_takelage(message.chat.id)
-
     await message.bot.edit_message_text(
         text="Основное меню 2:",
         chat_id=message.chat.id,
         message_id=menu2_id,
         reply_markup=menu2_kb(
             current_stone, current_price,
-            cntp, wal, bo, si, gl, ed, tak,
+            cntp, wal, bo, si, gl, ed,
             unit
         )
     )
 
-async def menu2_takelage_input(call: CallbackQuery, state: FSMContext):
+async def menu3_takelage_input(call: CallbackQuery, state: FSMContext):
     choice = "да" if call.data == "takel_yes" else "нет"
     chat_id = call.message.chat.id
 
     # Сохраняем выбор
     await set_menu2_takelage(chat_id, choice)
 
-    # Возвращаем FSM в состояние Settings.menu2
+    # Возвращаем FSM в состояние Settings.menu3
     data = await state.get_data()
-    menu2_id = data["menu2_message_id"]
+    menu3_id = data["menu3_message_id"]
     prompt_id = data.get("prompt_id")
-    await state.set_state(Settings.menu2)
+    await state.set_state(Settings.menu3)
 
-    # Повторно читаем все поля, включая только что установленный takelage
-    current_stone  = await get_general_stone_type(chat_id)
-    current_price  = await get_stone_price(chat_id)
-    unit           = await get_unit(chat_id)
-    cntp_m2 = await get_menu2_value(chat_id, "countertop", "м2")
-    cntp_mp = await get_menu2_value(chat_id, "countertop", "м/п")
-    cntp = f"{cntp_m2} м2 | {cntp_mp} п/м"
-
-    wal_m2 = await get_menu2_value(chat_id, "wall", "м2")
-    wal_mp = await get_menu2_value(chat_id, "wall", "м/п")
-    wal  = f"{wal_m2} м2 | {wal_mp} п/м"
-
-    bo   = await get_menu2_boil(chat_id)
-    si   = await get_menu2_sink(chat_id)
-    gl   = await get_menu2_glue(chat_id)
-    ed   = await get_menu2_value(chat_id, "edges", "м/п")
-    tak  = choice  # «да» или «нет»
+    km_current = await get_menu3_km(chat_id)
 
     # Удаляем сообщение с кнопками
     await call.message.delete()
     if prompt_id and prompt_id != call.message.message_id:
         await call.message.bot.delete_message(chat_id=chat_id, message_id=prompt_id)
 
-    # Перерисовываем меню 2
+    # Перерисовываем меню 3
     await call.message.bot.edit_message_text(
-        "Основное меню 2:",
-        reply_markup=menu2_kb(
-            current_stone, current_price,
-            cntp, wal, bo, si, gl, ed,
-            tak,
-            unit
-        ),
+        "Логистика:",
+        reply_markup=menu3_kb(km_current, choice),
         chat_id=chat_id,
-        message_id=menu2_id,
+        message_id=menu3_id,
     )
     await call.answer(f"Такелаж: {choice}")
 
@@ -2100,8 +2053,8 @@ async def main():
 
     # ─── Регистрируем обработчик «Рассчитать» ─────────────────────
     dp.callback_query.register(calculate_handler, lambda c: c.data == "calculate")
-    dp.callback_query.register(menu2_takelage_menu, lambda c: c.data == "menu2_takelage")
-    dp.callback_query.register(menu2_takelage_input, lambda c: c.data in {"takel_yes", "takel_no"})
+    dp.callback_query.register(menu3_takelage_menu, lambda c: c.data == "menu3_takelage")
+    dp.callback_query.register(menu3_takelage_input, lambda c: c.data in {"takel_yes", "takel_no"})
 
     # ─── (где-то после всех определений menu3_* и перед dp.start_polling) ─────────────────────────────────────
 
