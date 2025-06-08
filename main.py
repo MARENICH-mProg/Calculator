@@ -68,6 +68,12 @@ async def init_db():
                 chat_id                   INTEGER PRIMARY KEY,
                 unit                      TEXT    DEFAULT 'не выбрано',
                 tax_percent               TEXT    DEFAULT 'не указано',
+                tax_percent_quartz        TEXT    DEFAULT 'не указано',
+                tax_percent_acryl         TEXT    DEFAULT 'не указано',
+                mop_percent_quartz        TEXT    DEFAULT 'не указано',
+                mop_percent_acryl         TEXT    DEFAULT 'не указано',
+                margin_percent_quartz     TEXT    DEFAULT 'не указано',
+                margin_percent_acryl      TEXT    DEFAULT 'не указано',
                 measurement_fix           TEXT    DEFAULT 'не указано',
                 measurement_km            TEXT    DEFAULT 'не указано',
                 master_unit               TEXT    DEFAULT 'не выбрано',
@@ -155,7 +161,21 @@ async def init_db():
         # ─── добавляем колонки для меню 3 ────────────────────────
         for col in ("menu3_km", "menu3_mop", "menu3_margin"):
             if col not in cols:
-                await db.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'")
+                await db.execute(
+                    f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'"
+                )
+
+        # ─── новые колонки для процентов по камню ───────────────
+        pct_cols = [
+            "tax_percent_quartz", "tax_percent_acryl",
+            "mop_percent_quartz", "mop_percent_acryl",
+            "margin_percent_quartz", "margin_percent_acryl",
+        ]
+        for col in pct_cols:
+            if col not in cols:
+                await db.execute(
+                    f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'"
+                )
 
         await db.commit()
 
@@ -234,6 +254,29 @@ async def set_tax(chat_id: int, value: str):
             VALUES (?, ?)
             ON CONFLICT(chat_id) DO UPDATE SET tax_percent = excluded.tax_percent
         """, (chat_id, value))
+        await db.commit()
+
+async def get_tax_percent(chat_id: int, stone: str) -> str:
+    column = f"tax_percent_{stone}"
+    async with connection() as db:
+        cur = await db.execute(
+            f"SELECT {column} FROM user_settings WHERE chat_id = ?",
+            (chat_id,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else "не указано"
+
+async def set_tax_percent(chat_id: int, stone: str, value: str):
+    column = f"tax_percent_{stone}"
+    async with connection() as db:
+        await db.execute(
+            f"""
+            INSERT INTO user_settings(chat_id, {column})
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET {column} = excluded.{column}
+            """,
+            (chat_id, value),
+        )
         await db.commit()
 
 async def get_measurement_fix(chat_id: int) -> str:
@@ -506,6 +549,52 @@ async def set_menu3_margin(chat_id: int, value: str):
         """, (chat_id, value))
         await db.commit()
 
+async def get_mop_percent(chat_id: int, stone: str) -> str:
+    column = f"mop_percent_{stone}"
+    async with connection() as db:
+        cur = await db.execute(
+            f"SELECT {column} FROM user_settings WHERE chat_id = ?",
+            (chat_id,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else "не указано"
+
+async def set_mop_percent(chat_id: int, stone: str, value: str):
+    column = f"mop_percent_{stone}"
+    async with connection() as db:
+        await db.execute(
+            f"""
+            INSERT INTO user_settings(chat_id, {column})
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET {column} = excluded.{column}
+            """,
+            (chat_id, value),
+        )
+        await db.commit()
+
+async def get_margin_percent(chat_id: int, stone: str) -> str:
+    column = f"margin_percent_{stone}"
+    async with connection() as db:
+        cur = await db.execute(
+            f"SELECT {column} FROM user_settings WHERE chat_id = ?",
+            (chat_id,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else "не указано"
+
+async def set_margin_percent(chat_id: int, stone: str, value: str):
+    column = f"margin_percent_{stone}"
+    async with connection() as db:
+        await db.execute(
+            f"""
+            INSERT INTO user_settings(chat_id, {column})
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET {column} = excluded.{column}
+            """,
+            (chat_id, value),
+        )
+        await db.commit()
+
 # ─── далее продолжается остальной код ────────────────────────
 
 async def set_stone_price(chat_id: int, value: str):
@@ -530,19 +619,38 @@ async def set_measurement_km(chat_id: int, value: str):
 # ─── после этой строки идут функции main_menu и далее ────────
 
 # ─── 4) Построение главного меню ─────────────────────────────
-def main_menu(tax_value: str, fix_value: str, km_value: str, mop_value: str, margin_value: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="ЗП Мастера", callback_data="salary_master")],
-        [InlineKeyboardButton(text="ЗП Монтажника", callback_data="salary_installer")],
-        [InlineKeyboardButton(text=f"Система налогов | {tax_value}%", callback_data="set_tax_system")],
-        [InlineKeyboardButton(
-            text=f"Стоимость замеров | Фикс {fix_value} | КМ {km_value}",
-            callback_data="set_measurement_cost"
-        )],
-        [InlineKeyboardButton(text=f"МОП | {mop_value}%", callback_data="set_mop")],
-        [InlineKeyboardButton(text=f"Маржа | {margin_value}%", callback_data="set_margin")],
-        [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu2")],
-    ])
+def _display_pct(value: str) -> str:
+    return value if "%" in value else f"{value}%"
+
+
+def main_menu(
+    tax_value: str,
+    fix_value: str,
+    km_value: str,
+    mop_value: str,
+    margin_value: str,
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="ЗП Мастера", callback_data="salary_master")],
+            [InlineKeyboardButton(text="ЗП Монтажника", callback_data="salary_installer")],
+            [
+                InlineKeyboardButton(
+                    text=f"Система налогов | {_display_pct(tax_value)}",
+                    callback_data="set_tax_system",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=f"Стоимость замеров | Фикс {fix_value} | КМ {km_value}",
+                    callback_data="set_measurement_cost",
+                )
+            ],
+            [InlineKeyboardButton(text=f"МОП | {_display_pct(mop_value)}", callback_data="set_mop")],
+            [InlineKeyboardButton(text=f"Маржа | {_display_pct(margin_value)}", callback_data="set_margin")],
+            [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu2")],
+        ]
+    )
 
 def meas_submenu(fix: str, km: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -667,14 +775,23 @@ async def start_handler(message: Message, state: FSMContext):
     # Сбросим любое текущее состояние
     await state.clear()
 
-    tax  = await get_tax(message.chat.id)
+    tax_q = await get_tax_percent(message.chat.id, "quartz")
+    tax_a = await get_tax_percent(message.chat.id, "acryl")
+    tax_value = f"Кварц {tax_q}% | Акрил {tax_a}%"
+
+    mop_q = await get_mop_percent(message.chat.id, "quartz")
+    mop_a = await get_mop_percent(message.chat.id, "acryl")
+    mop_value = f"Кварц {mop_q}% | Акрил {mop_a}%"
+
+    margin_q = await get_margin_percent(message.chat.id, "quartz")
+    margin_a = await get_margin_percent(message.chat.id, "acryl")
+    margin_value = f"Кварц {margin_q}% | Акрил {margin_a}%"
+
     fix = await get_measurement_fix(message.chat.id)
     km  = await get_measurement_km(message.chat.id)
-    mop = await get_menu3_mop(message.chat.id)
-    margin = await get_menu3_margin(message.chat.id)
     await message.answer(
         "Привет! Настройте параметры:",
-        reply_markup=main_menu(tax, fix, km, mop, margin),
+        reply_markup=main_menu(tax_value, fix, km, mop_value, margin_value),
     )
 
 # ─── Хендлеры меню 3 ─────────────────────────────────────────
