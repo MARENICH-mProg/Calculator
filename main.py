@@ -236,6 +236,30 @@ async def set_tax(chat_id: int, value: str):
         """, (chat_id, value))
         await db.commit()
 
+async def get_tax_percent(chat_id: int, stone: str) -> str:
+    column = "tax_acryl" if stone == "acryl" else "tax_quartz"
+    async with connection() as db:
+        cur = await db.execute(
+            f"SELECT {column} FROM user_settings WHERE chat_id = ?",
+            (chat_id,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else "не указано"
+
+
+async def set_tax_percent(chat_id: int, stone: str, value: str):
+    column = "tax_acryl" if stone == "acryl" else "tax_quartz"
+    async with connection() as db:
+        await db.execute(
+            f"""
+            INSERT INTO user_settings(chat_id, {column})
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET {column} = excluded.{column}
+            """,
+            (chat_id, value),
+        )
+        await db.commit()
+
 async def get_measurement_fix(chat_id: int) -> str:
     async with connection() as db:
         cur = await db.execute("SELECT measurement_fix FROM user_settings WHERE chat_id = ?", (chat_id,))
@@ -504,6 +528,55 @@ async def set_menu3_margin(chat_id: int, value: str):
             VALUES (?, ?)
             ON CONFLICT(chat_id) DO UPDATE SET menu3_margin = excluded.menu3_margin
         """, (chat_id, value))
+        await db.commit()
+
+async def get_mop_percent(chat_id: int, stone: str) -> str:
+    column = "mop_acryl" if stone == "acryl" else "mop_quartz"
+    async with connection() as db:
+        cur = await db.execute(
+            f"SELECT {column} FROM user_settings WHERE chat_id = ?",
+            (chat_id,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else "не указано"
+
+
+async def set_mop_percent(chat_id: int, stone: str, value: str):
+    column = "mop_acryl" if stone == "acryl" else "mop_quartz"
+    async with connection() as db:
+        await db.execute(
+            f"""
+            INSERT INTO user_settings(chat_id, {column})
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET {column} = excluded.{column}
+            """,
+            (chat_id, value),
+        )
+        await db.commit()
+
+
+async def get_margin_percent(chat_id: int, stone: str) -> str:
+    column = "margin_acryl" if stone == "acryl" else "margin_quartz"
+    async with connection() as db:
+        cur = await db.execute(
+            f"SELECT {column} FROM user_settings WHERE chat_id = ?",
+            (chat_id,),
+        )
+        row = await cur.fetchone()
+        return row[0] if row else "не указано"
+
+
+async def set_margin_percent(chat_id: int, stone: str, value: str):
+    column = "margin_acryl" if stone == "acryl" else "margin_quartz"
+    async with connection() as db:
+        await db.execute(
+            f"""
+            INSERT INTO user_settings(chat_id, {column})
+            VALUES (?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET {column} = excluded.{column}
+            """,
+            (chat_id, value),
+        )
         await db.commit()
 
 # ─── далее продолжается остальной код ────────────────────────
