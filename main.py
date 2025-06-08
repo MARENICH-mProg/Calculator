@@ -1654,7 +1654,9 @@ async def menu2_item_input(message: Message, state: FSMContext):
     bo   = await get_menu2_boil(message.chat.id)
     si   = await get_menu2_sink(message.chat.id)
     gl   = await get_menu2_glue(message.chat.id)
-    ed   = await get_menu2_value(message.chat.id, "edges", unit)
+    # Для бортиков всегда используем значение в м/п независимо от выбранной
+    # единицы измерения меню.
+    ed   = await get_menu2_value(message.chat.id, "edges", "м/п")
     tak = await get_menu2_takelage(message.chat.id)
 
     await message.bot.edit_message_text(
