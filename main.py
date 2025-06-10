@@ -722,6 +722,20 @@ async def set_measurement_km(chat_id: int, value: str):
         await db.commit()
 # ─── после этой строки идут функции main_menu и далее ────────
 
+def home_menu() -> InlineKeyboardMarkup:
+    """Keyboard for the initial home screen."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Настройки", callback_data="open_settings")],
+            [InlineKeyboardButton(text="Список настроек", callback_data="show_settings")],
+        ]
+    )
+
+def back_home_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="← Назад", callback_data="back_home")]]
+    )
+
 # ─── 4) Построение главного меню ─────────────────────────────
 
 def _display_pct(value: str) -> str:
@@ -821,6 +835,50 @@ def salary_item_kb(role: str, stone: str, unit: str, values: dict[str,str]) -> I
     kb.append([InlineKeyboardButton(text="← Назад", callback_data=f"salary_{role}_stone_back")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
+
+async def build_settings_text(chat_id: int) -> str:
+    """Return a formatted list of all user settings."""
+    master_unit = await get_master_unit(chat_id)
+    installer_unit = await get_installer_unit(chat_id)
+    fix = await get_measurement_fix(chat_id)
+    km = await get_measurement_km(chat_id)
+
+    lines = [
+        "Общие настройки",
+        f" Фикс замеров: {fix}",
+        f" Километры замеров: {km}",
+        "",
+    ]
+
+    for label, stone in [("Акрил", "acryl"), ("Кварц", "quartz")]:
+        tax = await get_tax_value(chat_id, stone)
+        mop = await get_mop_value(chat_id, stone)
+        margin = await get_margin_value(chat_id, stone)
+        lines += [
+            label,
+            f" Налог: {tax}%",
+            f" МОП: {mop}%",
+            f" Маржа: {margin}%",
+            "",
+            " ЗП Мастера",
+            f"  Столешница - {await get_salary(chat_id, f'master_{stone}_countertop')} {master_unit}",
+            f"  Стеновая - {await get_salary(chat_id, f'master_{stone}_wall')} {master_unit}",
+            f"  Вырез варка - {await get_salary(chat_id, f'master_{stone}_boil')} шт",
+            f"  Вырез мойка - {await get_salary(chat_id, f'master_{stone}_sink')} шт",
+            f"  Подклейка - {await get_salary(chat_id, f'master_{stone}_glue')} шт",
+            f"  Бортики - {await get_salary(chat_id, f'master_{stone}_edges')} м/п",
+            "",
+            " ЗП Монтажника",
+            f"  Столешница - {await get_salary(chat_id, f'installer_{stone}_countertop')} {installer_unit}",
+            f"  Стеновая - {await get_salary(chat_id, f'installer_{stone}_wall')} {installer_unit}",
+            f"  Доставка - {await get_salary(chat_id, f'installer_{stone}_delivery')} ₽",
+            f"  КМ Доставки - {await get_salary(chat_id, f'installer_{stone}_delivery_km')} ₽",
+            f"  Такелаж - {await get_salary(chat_id, f'installer_{stone}_takelage')} ₽",
+            "",
+        ]
+
+    return "\n".join(lines).strip()
+
 # ─── Новый блок: меню 2 ──────────────────────────────────────
 def menu2_kb(stone: str, price: str,
              cntp: str, wal: str, bo: str, si: str, gl: str, ed: str,
@@ -881,16 +939,45 @@ async def start_handler(message: Message, state: FSMContext):
     # Сбросим любое текущее состояние
     await state.clear()
 
-    tax_value = await get_tax(message.chat.id)
-    mop_value = await get_menu3_mop(message.chat.id)
-    margin_value = await get_menu3_margin(message.chat.id)
-
-    fix = await get_measurement_fix(message.chat.id)
-    km  = await get_measurement_km(message.chat.id)
     await message.answer(
-        "Привет! Настройте параметры:",
+        "Привет! Выберите действие:",
+        reply_markup=home_menu(),
+    )
+
+async def open_settings(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    tax_value = await get_tax(call.message.chat.id)
+    mop_value = await get_menu3_mop(call.message.chat.id)
+    margin_value = await get_menu3_margin(call.message.chat.id)
+    fix = await get_measurement_fix(call.message.chat.id)
+    km = await get_measurement_km(call.message.chat.id)
+    await safe_edit_message_text(
+        call.message.edit_text,
+        "Параметры:",
         reply_markup=main_menu(tax_value, fix, km, mop_value, margin_value),
     )
+    await call.answer()
+
+
+async def show_settings(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    text = await build_settings_text(call.message.chat.id)
+    await safe_edit_message_text(
+        call.message.edit_text,
+        text,
+        reply_markup=back_home_kb(),
+    )
+    await call.answer()
+
+
+async def back_home(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await safe_edit_message_text(
+        call.message.edit_text,
+        "Привет! Выберите действие:",
+        reply_markup=home_menu(),
+    )
+    await call.answer()
 
 # ─── Хендлеры меню 3 ─────────────────────────────────────────
 
@@ -2263,6 +2350,9 @@ async def main():
 
     # Регистрация хендлеров
     dp.message.register(start_handler, CommandStart())
+    dp.callback_query.register(open_settings, lambda c: c.data == "open_settings")
+    dp.callback_query.register(show_settings, lambda c: c.data == "show_settings")
+    dp.callback_query.register(back_home, lambda c: c.data == "back_home")
 
     dp.callback_query.register(set_unit_menu, lambda c: c.data == "set_unit")
     dp.callback_query.register(unit_choice,   lambda c: c.data in ("unit_m2", "unit_mp"))
