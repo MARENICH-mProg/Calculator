@@ -1317,8 +1317,6 @@ async def back_to_menu2(call: CallbackQuery, state: FSMContext):
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
     km_val    = await get_menu3_km(chat_id)
     takel_val = await get_menu2_takelage(chat_id)
-    km_val = await get_menu3_km(chat_id)
-    takel_val = await get_menu2_takelage(chat_id)
     await safe_edit_message_text(call.message.edit_text, 
         "Основное меню 2:",
         reply_markup=menu2_kb(
