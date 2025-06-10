@@ -11,7 +11,7 @@ Install them with:
 
 ```bash
 python -m pip install --upgrade pip
-pip install aiogram aiosqlite
+pip install -r requirements.txt
 ```
 
 ## Database
