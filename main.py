@@ -728,6 +728,7 @@ def home_menu() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="Настройки", callback_data="open_settings")],
             [InlineKeyboardButton(text="Список настроек", callback_data="show_settings")],
+            [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu2")],
         ]
     )
 
