@@ -2420,6 +2420,9 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
             f"Получилось: маржа={fmt_num(margin)}%, МОП={fmt_num(mop)}%, налог={fmt_num(tax)}% → сумма={fmt_num(total_pct)}%",
             "Невозможно рассчитать итоговую стоимость для клиента."
         ]
+        verification_log = (
+            "❗ Невозможно проверить маржу: сумма процентов превышает 100%."
+        )
     else:
         # итоговая цена для клиента:
         # client_price = total_cost_price * 100 / (100 − total_pct)
@@ -2436,17 +2439,17 @@ async def calculate_handler(call: CallbackQuery, state: FSMContext):
             f"Итого клиент: {fmt_client(client_price)} ₽"
         ]
 
-    # ——— проверка введённой маржи ———
-    implied_total_pct = (client_price - total_cost_price) / client_price * 100
-    implied_margin = implied_total_pct - (mop + tax)
-    # округлим до сотых
-    if abs(implied_margin - margin) < 0.01:
-        verification_log = f"✅ Маржа подтверждена: {round(implied_margin, 2):.2f}% соответствует введённой {round(margin, 2):.2f}%."
-    else:
-        verification_log = (
-            f"❗ Расхождение маржи: рассчитано {round(implied_margin, 2):.2f}%, "
-            f"а введено {round(margin, 2):.2f}%."
-        )
+        # ——— проверка введённой маржи ———
+        implied_total_pct = (client_price - total_cost_price) / client_price * 100
+        implied_margin = implied_total_pct - (mop + tax)
+        # округлим до сотых
+        if abs(implied_margin - margin) < 0.01:
+            verification_log = f"✅ Маржа подтверждена: {round(implied_margin, 2):.2f}% соответствует введённой {round(margin, 2):.2f}%."
+        else:
+            verification_log = (
+                f"❗ Расхождение маржи: рассчитано {round(implied_margin, 2):.2f}%, "
+                f"а введено {round(margin, 2):.2f}%."
+            )
 
 
     await call.message.answer("\n".join(master_log))
