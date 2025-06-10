@@ -924,7 +924,10 @@ def menu2_kb(
         ],
         [InlineKeyboardButton(text=f"КМ от МКАД | {km}", callback_data="menu3_km")],
         [InlineKeyboardButton(text=f"Такелаж | {takel}", callback_data="menu3_takelage")],
-        [InlineKeyboardButton(text="← Назад", callback_data="back_to_main")],
+        [
+            InlineKeyboardButton(text="← Назад", callback_data="back_home"),
+            InlineKeyboardButton(text="Рассчитать", callback_data="calculate"),
+        ],
     ])
 
 
@@ -1783,22 +1786,6 @@ async def stone_price_input(message: Message, state: FSMContext):
         )
     )
 
-
-
-async def back_to_main(call: CallbackQuery, state: FSMContext):
-    # Возвращаемся в главное меню
-    await state.clear()
-    tax  = await get_tax(call.message.chat.id)
-    fix  = await get_measurement_fix(call.message.chat.id)
-    km   = await get_measurement_km(call.message.chat.id)
-    mop  = await get_menu3_mop(call.message.chat.id)
-    margin = await get_menu3_margin(call.message.chat.id)
-    await safe_edit_message_text(call.message.edit_text, 
-        "Привет! Настройте параметры:",
-        reply_markup=main_menu(tax, fix, km, mop, margin)
-    )
-    await call.answer()
-
 # ─── 6.1) Переход в ввод конкретной строки меню 2 ─────────────
 async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
     """Показываем выбор единицы для ввода значения."""
@@ -2532,7 +2519,6 @@ async def main():
     dp.callback_query.register(stone2_selected, lambda c: c.data in ("stone2_acryl", "stone2_quartz"))
     dp.callback_query.register(stone_price_menu, lambda c: c.data == "set_stone_price")
     dp.message.register(stone_price_input, Settings.stone_price)
-    dp.callback_query.register(back_to_main, lambda c: c.data == "back_to_main")
     # ─── регистрируем шесть новых пунктов menu2 ──────────────
     dp.callback_query.register(menu2_item_menu, lambda c: c.data in {"menu2_countertop", "menu2_wall", "menu2_boil", "menu2_sink", "menu2_glue", "menu2_edges"})
     dp.callback_query.register(menu2_unit_choice, lambda c: c.data in {"menu2_unit_m2", "menu2_unit_mp"})
