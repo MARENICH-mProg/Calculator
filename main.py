@@ -767,7 +767,7 @@ def main_menu(
             ],
             [InlineKeyboardButton(text=f"МОП | {_display_pct(mop_value)}", callback_data="set_mop")],
             [InlineKeyboardButton(text=f"Маржа | {_display_pct(margin_value)}", callback_data="set_margin")],
-            [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu2")],
+            [InlineKeyboardButton(text="← Назад", callback_data="back_home")],
         ]
     )
 
