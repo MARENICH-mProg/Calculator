@@ -200,15 +200,6 @@ async def init_db():
                 )
 
 
-        # дополнительные колонки для налогов/МОП/маржи по камням
-        for col in (
-            "tax_acryl", "tax_quartz",
-            "mop_acryl", "mop_quartz",
-            "margin_acryl", "margin_quartz",
-        ):
-            if col not in cols:
-                await db.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT 'не указано'")
-
 
         await db.commit()
 
