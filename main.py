@@ -62,6 +62,9 @@ class Settings(StatesGroup):
     mop_stone    = State()  # выбор камня для МОП
     margin_stone = State()  # выбор камня для маржи
 
+    choose_stone = State()  # выбор камня на старте настроек
+    stone_settings = State()  # меню настроек выбранного камня
+
 
 # ─── 2) Инициализация базы ────────────────────────────────────
 async def init_db():
@@ -736,6 +739,14 @@ def back_home_kb() -> InlineKeyboardMarkup:
         inline_keyboard=[[InlineKeyboardButton(text="← Назад", callback_data="back_home")]]
     )
 
+def stone_choice_kb() -> InlineKeyboardMarkup:
+    """Keyboard to choose a stone type."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Акрил", callback_data="settings_acryl")],
+        [InlineKeyboardButton(text="Кварц", callback_data="settings_quartz")],
+        [InlineKeyboardButton(text="← Назад", callback_data="back_home")],
+    ])
+
 # ─── 4) Построение главного меню ─────────────────────────────
 
 def _display_pct(value: str) -> str:
@@ -804,6 +815,20 @@ def stone_menu_kb(role: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="Акрил",  callback_data=f"salary_{role}_acryl")],
         [InlineKeyboardButton(text="Кварц",  callback_data=f"salary_{role}_quartz")],
         [InlineKeyboardButton(text="← Назад", callback_data=f"salary_{role}_stone_back")],
+    ])
+
+async def stone_settings_menu(chat_id: int, stone: str) -> InlineKeyboardMarkup:
+    """Menu with settings for a specific stone."""
+    tax = await get_tax_value(chat_id, stone)
+    mop = await get_mop_value(chat_id, stone)
+    margin = await get_margin_value(chat_id, stone)
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="ЗП Мастера", callback_data="salary_master")],
+        [InlineKeyboardButton(text="ЗП Монтажника", callback_data="salary_installer")],
+        [InlineKeyboardButton(text=f"Налог | {_display_pct(tax)}", callback_data="set_tax_system")],
+        [InlineKeyboardButton(text=f"МОП | {_display_pct(mop)}", callback_data="set_mop")],
+        [InlineKeyboardButton(text=f"Маржа | {_display_pct(margin)}", callback_data="set_margin")],
+        [InlineKeyboardButton(text="← Назад", callback_data="open_settings")],
     ])
 
 def salary_item_kb(role: str, stone: str, unit: str, values: dict[str,str]) -> InlineKeyboardMarkup:
@@ -1011,15 +1036,24 @@ async def calculation_command(message: Message, state: FSMContext):
 
 async def open_settings(call: CallbackQuery, state: FSMContext):
     await state.clear()
-    tax_value = await get_tax(call.message.chat.id)
-    mop_value = await get_menu3_mop(call.message.chat.id)
-    margin_value = await get_menu3_margin(call.message.chat.id)
-    fix = await get_measurement_fix(call.message.chat.id)
-    km = await get_measurement_km(call.message.chat.id)
+    await state.set_state(Settings.choose_stone)
+    await safe_edit_message_text(
+        call.message.edit_text,
+        "Выберите тип камня:",
+        reply_markup=stone_choice_kb(),
+    )
+    await call.answer()
+
+async def choose_stone(call: CallbackQuery, state: FSMContext):
+    """Handle stone selection from the settings menu."""
+    stone = "acryl" if call.data.endswith("acryl") else "quartz"
+    await state.set_state(Settings.stone_settings)
+    await state.update_data(stone=stone)
+    kb = await stone_settings_menu(call.message.chat.id, stone)
     await safe_edit_message_text(
         call.message.edit_text,
         "Параметры:",
-        reply_markup=main_menu(tax_value, fix, km, mop_value, margin_value),
+        reply_markup=kb,
     )
     await call.answer()
 
@@ -1161,25 +1195,38 @@ async def menu3_mop_input(message: Message, state: FSMContext):
         await state.set_state(Settings.menu3)
         km_current  = await get_menu3_km(message.chat.id)
         takel_current = await get_menu2_takelage(message.chat.id)
-        await safe_edit_message_text(message.bot.edit_message_text, 
+        await safe_edit_message_text(message.bot.edit_message_text,
             text="Логистика:",
             chat_id=message.chat.id,
             message_id=menu3_id,
             reply_markup=menu3_kb(km_current, takel_current)
         )
     else:
-        await state.clear()
-        tax  = await get_tax(message.chat.id)
-        fix  = await get_measurement_fix(message.chat.id)
-        km   = await get_measurement_km(message.chat.id)
-        mop  = await get_menu3_mop(message.chat.id)
-        margin = await get_menu3_margin(message.chat.id)
-        await safe_edit_message_text(message.bot.edit_message_text, 
-            text="Параметры:",
-            chat_id=message.chat.id,
-            message_id=menu_id,
-            reply_markup=main_menu(tax, fix, km, mop, margin)
-        )
+        if stone:
+            await state.set_state(Settings.stone_settings)
+            await state.update_data(stone=stone)
+            kb = await stone_settings_menu(message.chat.id, stone)
+            await safe_edit_message_text(
+                message.bot.edit_message_text,
+                text="Параметры:",
+                chat_id=message.chat.id,
+                message_id=menu_id,
+                reply_markup=kb,
+            )
+        else:
+            await state.clear()
+            tax  = await get_tax(message.chat.id)
+            fix  = await get_measurement_fix(message.chat.id)
+            km   = await get_measurement_km(message.chat.id)
+            mop  = await get_menu3_mop(message.chat.id)
+            margin = await get_menu3_margin(message.chat.id)
+            await safe_edit_message_text(
+                message.bot.edit_message_text,
+                text="Параметры:",
+                chat_id=message.chat.id,
+                message_id=menu_id,
+                reply_markup=main_menu(tax, fix, km, mop, margin)
+            )
 
 
 async def menu3_margin_menu(call: CallbackQuery, state: FSMContext):
@@ -1213,25 +1260,38 @@ async def menu3_margin_input(message: Message, state: FSMContext):
         await state.set_state(Settings.menu3)
         km_current = await get_menu3_km(message.chat.id)
         takel_current = await get_menu2_takelage(message.chat.id)
-        await safe_edit_message_text(message.bot.edit_message_text, 
+        await safe_edit_message_text(message.bot.edit_message_text,
             text="Логистика:",
             chat_id=message.chat.id,
             message_id=menu3_id,
             reply_markup=menu3_kb(km_current, takel_current),
         )
     else:
-        await state.clear()
-        tax = await get_tax(message.chat.id)
-        fix = await get_measurement_fix(message.chat.id)
-        km = await get_measurement_km(message.chat.id)
-        mop = await get_menu3_mop(message.chat.id)
-        margin = await get_menu3_margin(message.chat.id)
-        await safe_edit_message_text(message.bot.edit_message_text, 
-            text="Параметры:",
-            chat_id=message.chat.id,
-            message_id=menu_id,
-            reply_markup=main_menu(tax, fix, km, mop, margin),
-        )
+        if stone:
+            await state.set_state(Settings.stone_settings)
+            await state.update_data(stone=stone)
+            kb = await stone_settings_menu(message.chat.id, stone)
+            await safe_edit_message_text(
+                message.bot.edit_message_text,
+                text="Параметры:",
+                chat_id=message.chat.id,
+                message_id=menu_id,
+                reply_markup=kb,
+            )
+        else:
+            await state.clear()
+            tax = await get_tax(message.chat.id)
+            fix = await get_measurement_fix(message.chat.id)
+            km = await get_measurement_km(message.chat.id)
+            mop = await get_menu3_mop(message.chat.id)
+            margin = await get_menu3_margin(message.chat.id)
+            await safe_edit_message_text(
+                message.bot.edit_message_text,
+                text="Параметры:",
+                chat_id=message.chat.id,
+                message_id=menu_id,
+                reply_markup=main_menu(tax, fix, km, mop, margin),
+            )
 
 
 async def back_to_menu2(call: CallbackQuery, state: FSMContext):
@@ -1308,14 +1368,21 @@ async def unit_choice(call: CallbackQuery, state: FSMContext):
 
 
 async def set_tax_menu(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Settings.tax_stone)
+    data = await state.get_data()
+    stone = data.get("stone")
     await state.update_data(menu_message_id=call.message.message_id)
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Акрил", callback_data="tax_stone_acryl")],
-        [InlineKeyboardButton(text="Кварц", callback_data="tax_stone_quartz")],
-    ])
-    msg = await call.message.answer("Выберите тип камня:", reply_markup=kb)
-    await state.update_data(prompt_id=msg.message_id)
+    if stone:
+        await state.set_state(Settings.tax)
+        msg = await call.message.answer("Введите процент (целое число от 0 до 100):")
+        await state.update_data(prompt_id=msg.message_id)
+    else:
+        await state.set_state(Settings.tax_stone)
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Акрил", callback_data="tax_stone_acryl")],
+            [InlineKeyboardButton(text="Кварц", callback_data="tax_stone_quartz")],
+        ])
+        msg = await call.message.answer("Выберите тип камня:", reply_markup=kb)
+        await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def tax_stone_choice(call: CallbackQuery, state: FSMContext):
@@ -1353,20 +1420,35 @@ async def tax_input(message: Message, state: FSMContext):
         await message.bot.delete_message(chat_id=message.chat.id, message_id=prompt_id)
 
     # 3) Завершаем FSM-состояние
-    await state.clear()
+    if stone:
+        await state.set_state(Settings.stone_settings)
+        await state.update_data(stone=stone)
+    else:
+        await state.clear()
 
     # 4) Редактируем то же сообщение-меню
-    tax  = await get_tax(message.chat.id)
-    fix = await get_measurement_fix(message.chat.id)
-    km  = await get_measurement_km(message.chat.id)
-    mop = await get_menu3_mop(message.chat.id)
-    margin = await get_menu3_margin(message.chat.id)
-    await safe_edit_message_text(message.bot.edit_message_text, 
-        text="Параметры:",
-        chat_id=message.chat.id,
-        message_id=menu_id,
-        reply_markup=main_menu(tax, fix, km, mop, margin)
-    )
+    if stone:
+        kb = await stone_settings_menu(message.chat.id, stone)
+        await safe_edit_message_text(
+            message.bot.edit_message_text,
+            text="Параметры:",
+            chat_id=message.chat.id,
+            message_id=menu_id,
+            reply_markup=kb,
+        )
+    else:
+        tax  = await get_tax(message.chat.id)
+        fix = await get_measurement_fix(message.chat.id)
+        km  = await get_measurement_km(message.chat.id)
+        mop = await get_menu3_mop(message.chat.id)
+        margin = await get_menu3_margin(message.chat.id)
+        await safe_edit_message_text(
+            message.bot.edit_message_text,
+            text="Параметры:",
+            chat_id=message.chat.id,
+            message_id=menu_id,
+            reply_markup=main_menu(tax, fix, km, mop, margin)
+        )
 
 async def set_measurement_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.meas_menu)
@@ -1445,14 +1527,21 @@ async def price_inst_deliv_km_input(message: Message, state: FSMContext):
     )
 
 async def set_mop_main(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Settings.mop_stone)
+    data = await state.get_data()
+    stone = data.get("stone")
     await state.update_data(menu_message_id=call.message.message_id)
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Акрил", callback_data="mop_stone_acryl")],
-        [InlineKeyboardButton(text="Кварц", callback_data="mop_stone_quartz")],
-    ])
-    msg = await call.message.answer("Выберите тип камня:", reply_markup=kb)
-    await state.update_data(prompt_id=msg.message_id)
+    if stone:
+        await state.set_state(Settings.menu3_mop)
+        msg = await call.message.answer("Введите проценты МОПу (целое число от 0 до 100):")
+        await state.update_data(prompt_id=msg.message_id)
+    else:
+        await state.set_state(Settings.mop_stone)
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Акрил", callback_data="mop_stone_acryl")],
+            [InlineKeyboardButton(text="Кварц", callback_data="mop_stone_quartz")],
+        ])
+        msg = await call.message.answer("Выберите тип камня:", reply_markup=kb)
+        await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def mop_stone_choice(call: CallbackQuery, state: FSMContext):
@@ -1466,14 +1555,21 @@ async def mop_stone_choice(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 async def set_margin_main(call: CallbackQuery, state: FSMContext):
-    await state.set_state(Settings.margin_stone)
+    data = await state.get_data()
+    stone = data.get("stone")
     await state.update_data(menu_message_id=call.message.message_id)
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Акрил", callback_data="margin_stone_acryl")],
-        [InlineKeyboardButton(text="Кварц", callback_data="margin_stone_quartz")],
-    ])
-    msg = await call.message.answer("Выберите тип камня:", reply_markup=kb)
-    await state.update_data(prompt_id=msg.message_id)
+    if stone:
+        await state.set_state(Settings.menu3_margin)
+        msg = await call.message.answer("Введите маржу в % (целое число от 0 до 100):")
+        await state.update_data(prompt_id=msg.message_id)
+    else:
+        await state.set_state(Settings.margin_stone)
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Акрил", callback_data="margin_stone_acryl")],
+            [InlineKeyboardButton(text="Кварц", callback_data="margin_stone_quartz")],
+        ])
+        msg = await call.message.answer("Выберите тип камня:", reply_markup=kb)
+        await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
 async def margin_stone_choice(call: CallbackQuery, state: FSMContext):
@@ -1489,12 +1585,39 @@ async def margin_stone_choice(call: CallbackQuery, state: FSMContext):
 async def salary_role_menu(call: CallbackQuery, state: FSMContext):
     # call.data == "salary_master" или "salary_installer"
     role = call.data.split("_")[1]      # -> "master" или "installer"
-    await state.set_state(Settings.salary_role)
+    data = await state.get_data()
+    stone = data.get("stone")
     await state.update_data(menu_message_id=call.message.message_id, role=role)
-    await safe_edit_message_text(call.message.edit_text, 
-        "Выберите тип камня:",
-        reply_markup=stone_menu_kb(role)
-    )
+    if stone:
+        await state.set_state(Settings.salary_stone)
+        if role == "master":
+            unit = await get_master_unit(call.message.chat.id)
+        else:
+            unit = await get_installer_unit(call.message.chat.id)
+        keys = ["countertop", "wall"]
+        if role == "master":
+            keys += ["boil", "sink", "glue", "edges"]
+        else:
+            keys += ["delivery", "delivery_km", "takelage"]
+        values = {
+            k: await get_salary(
+                call.message.chat.id,
+                f"{role}_{stone}_{k}"
+            )
+            for k in keys
+        }
+        await safe_edit_message_text(
+            call.message.edit_text,
+            f"Установки для { 'акрилового' if stone=='acryl' else 'кварцевого' } камня:",
+            reply_markup=salary_item_kb(role, stone, unit, values),
+        )
+    else:
+        await state.set_state(Settings.salary_role)
+        await safe_edit_message_text(
+            call.message.edit_text,
+            "Выберите тип камня:",
+            reply_markup=stone_menu_kb(role),
+        )
     await call.answer()
 
 
@@ -1522,17 +1645,28 @@ async def salary_stone_choice(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 async def salary_stone_back(call: CallbackQuery, state: FSMContext):
-    # Возвращаемся в главное меню
-    await state.clear()
-    tax  = await get_tax(call.message.chat.id)
-    fix  = await get_measurement_fix(call.message.chat.id)
-    km   = await get_measurement_km(call.message.chat.id)
-    mop  = await get_menu3_mop(call.message.chat.id)
-    margin = await get_menu3_margin(call.message.chat.id)
-    await safe_edit_message_text(call.message.edit_text, 
-        "Параметры:",
-        reply_markup=main_menu(tax, fix, km, mop, margin)
-    )
+    data = await state.get_data()
+    stone = data.get("stone")
+    if stone:
+        await state.set_state(Settings.stone_settings)
+        kb = await stone_settings_menu(call.message.chat.id, stone)
+        await safe_edit_message_text(
+            call.message.edit_text,
+            "Параметры:",
+            reply_markup=kb,
+        )
+    else:
+        await state.clear()
+        tax  = await get_tax(call.message.chat.id)
+        fix  = await get_measurement_fix(call.message.chat.id)
+        km   = await get_measurement_km(call.message.chat.id)
+        mop  = await get_menu3_mop(call.message.chat.id)
+        margin = await get_menu3_margin(call.message.chat.id)
+        await safe_edit_message_text(
+            call.message.edit_text,
+            "Параметры:",
+            reply_markup=main_menu(tax, fix, km, mop, margin)
+        )
     await call.answer()
 
 async def salary_item_menu(call: CallbackQuery, state: FSMContext):
@@ -2476,6 +2610,7 @@ async def main():
     dp.message.register(settings_command, Command("settings"))
     dp.message.register(calculation_command, Command("calculation"))
     dp.callback_query.register(open_settings, lambda c: c.data == "open_settings")
+    dp.callback_query.register(choose_stone, lambda c: c.data in {"settings_acryl", "settings_quartz"})
     dp.callback_query.register(show_settings, lambda c: c.data == "show_settings")
     dp.callback_query.register(back_home, lambda c: c.data == "back_home")
 
