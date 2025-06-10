@@ -990,16 +990,12 @@ async def start_handler(message: Message, state: FSMContext):
     )
 
 async def settings_command(message: Message, state: FSMContext):
-    """Handle /settings command by showing the main settings menu."""
+    """Handle /settings command by prompting to choose a stone type."""
     await state.clear()
-    tax_value = await get_tax(message.chat.id)
-    mop_value = await get_menu3_mop(message.chat.id)
-    margin_value = await get_menu3_margin(message.chat.id)
-    fix = await get_measurement_fix(message.chat.id)
-    km = await get_measurement_km(message.chat.id)
+    await state.set_state(Settings.choose_stone)
     await message.answer(
-        "Параметры:",
-        reply_markup=main_menu(tax_value, fix, km, mop_value, margin_value),
+        "Выберите тип камня:",
+        reply_markup=stone_choice_kb(),
     )
 
 async def calculation_command(message: Message, state: FSMContext):

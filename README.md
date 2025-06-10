@@ -27,6 +27,7 @@ python main.py
 
 ## Main commands
 - `/start` — reset the state and open the main menu.
+- `/settings` — same as tapping "Настройки" on the home screen.
 - "Единица измерения" — choose units (m² or linear meters).
 - "Система налогов" — configure tax percentages separately for quartz and acrylic.
 - "Стоимость замеров" — configure fixed price and per‑kilometer price for measurements.
