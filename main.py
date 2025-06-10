@@ -739,6 +739,11 @@ def back_home_kb() -> InlineKeyboardMarkup:
         inline_keyboard=[[InlineKeyboardButton(text="← Назад", callback_data="back_home")]]
     )
 
+def cancel_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="Отмена", callback_data="cancel_input")]]
+    )
+
 def stone_choice_kb() -> InlineKeyboardMarkup:
     """Keyboard to choose a stone type."""
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -1098,7 +1103,10 @@ async def to_menu3(call: CallbackQuery, state: FSMContext):
 async def menu3_km_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.menu3_km)
     await state.update_data(menu2_message_id=call.message.message_id)
-    msg = await call.message.answer("Введите количество КМ (целое число):")
+    msg = await call.message.answer(
+        "Введите количество КМ (целое число):",
+        reply_markup=cancel_kb(),
+    )
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
@@ -1170,7 +1178,10 @@ async def menu3_mop_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.menu3_mop)
     data = await state.get_data()
     await state.update_data(menu3_message_id=data["menu3_message_id"])
-    msg = await call.message.answer("Введите проценты МОПу (целое число от 0 до 100):")
+    msg = await call.message.answer(
+        "Введите проценты МОПу (целое число от 0 до 100):",
+        reply_markup=cancel_kb(),
+    )
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
@@ -1234,7 +1245,8 @@ async def menu3_margin_menu(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await state.update_data(menu3_message_id=data.get("menu3_message_id"))
     msg = await call.message.answer(
-        "Введите маржу в % (целое число от 0 до 100):"
+        "Введите маржу в % (целое число от 0 до 100):",
+        reply_markup=cancel_kb(),
     )
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
@@ -1371,7 +1383,10 @@ async def set_tax_menu(call: CallbackQuery, state: FSMContext):
     await state.update_data(menu_message_id=call.message.message_id)
     if stone:
         await state.set_state(Settings.tax)
-        msg = await call.message.answer("Введите процент (целое число от 0 до 100):")
+        msg = await call.message.answer(
+            "Введите процент (целое число от 0 до 100):",
+            reply_markup=cancel_kb(),
+        )
         await state.update_data(prompt_id=msg.message_id)
     else:
         await state.set_state(Settings.tax_stone)
@@ -1460,7 +1475,10 @@ async def meas_fix_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.meas_fix)
     data = await state.get_data()
     await state.update_data(menu_message_id=data["menu_message_id"])
-    msg = await call.message.answer("Введите фиксированную стоимость выезда для замеров (₽):")
+    msg = await call.message.answer(
+        "Введите фиксированную стоимость выезда для замеров (₽):",
+        reply_markup=cancel_kb(),
+    )
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
@@ -1468,7 +1486,10 @@ async def price_inst_deliv_km_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.meas_km)
     data = await state.get_data()
     await state.update_data(menu_message_id=data["menu_message_id"])
-    msg = await call.message.answer("Введите стоимость одного километра (₽):")
+    msg = await call.message.answer(
+        "Введите стоимость одного километра (₽):",
+        reply_markup=cancel_kb(),
+    )
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
@@ -1530,7 +1551,10 @@ async def set_mop_main(call: CallbackQuery, state: FSMContext):
     await state.update_data(menu_message_id=call.message.message_id)
     if stone:
         await state.set_state(Settings.menu3_mop)
-        msg = await call.message.answer("Введите проценты МОПу (целое число от 0 до 100):")
+        msg = await call.message.answer(
+            "Введите проценты МОПу (целое число от 0 до 100):",
+            reply_markup=cancel_kb(),
+        )
         await state.update_data(prompt_id=msg.message_id)
     else:
         await state.set_state(Settings.mop_stone)
@@ -1558,7 +1582,10 @@ async def set_margin_main(call: CallbackQuery, state: FSMContext):
     await state.update_data(menu_message_id=call.message.message_id)
     if stone:
         await state.set_state(Settings.menu3_margin)
-        msg = await call.message.answer("Введите маржу в % (целое число от 0 до 100):")
+        msg = await call.message.answer(
+            "Введите маржу в % (целое число от 0 до 100):",
+            reply_markup=cancel_kb(),
+        )
         await state.update_data(prompt_id=msg.message_id)
     else:
         await state.set_state(Settings.margin_stone)
@@ -1681,12 +1708,16 @@ async def salary_item_menu(call: CallbackQuery, state: FSMContext):
       "delivery":"Доставка","takelage":"Такелаж",
     }[item]
     if item == "delivery":
-        msg = await call.message.answer("Введите фиксированную стоимость доставки (₽):")
+        msg = await call.message.answer(
+            "Введите фиксированную стоимость доставки (₽):",
+            reply_markup=cancel_kb(),
+        )
         await state.update_data(prompt_id=msg.message_id, substep="fix")
     else:
         unit_hint = 'м/п' if item == 'edges' else ('м2' if item in ['countertop','wall','takelage'] else 'шт.')
         msg = await call.message.answer(
-            f"Введите сумму для {label} ({unit_hint}):"
+            f"Введите сумму для {label} ({unit_hint}):",
+            reply_markup=cancel_kb(),
         )
         await state.update_data(prompt_id=msg.message_id)
     await call.answer()
@@ -1704,7 +1735,10 @@ async def salary_item_input(message: Message, state: FSMContext):
         step = data.get("substep", "fix")
         if step == "fix":
             await set_salary(message.chat.id, f"{role}_{stone}_delivery", text)
-            msg = await message.answer("Введите стоимость за километр (₽):")
+            msg = await message.answer(
+                "Введите стоимость за километр (₽):",
+                reply_markup=cancel_kb(),
+            )
             await state.update_data(substep="km", prompt_id=msg.message_id)
             await message.delete()
             if prompt_id:
@@ -1874,7 +1908,10 @@ async def stone_price_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.stone_price)
     data = await state.get_data()
     await state.update_data(menu2_message_id=data["menu2_message_id"])
-    msg = await call.message.answer("Введите цену за камень (только цифры):")
+    msg = await call.message.answer(
+        "Введите цену за камень (только цифры):",
+        reply_markup=cancel_kb(),
+    )
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
@@ -1969,13 +2006,17 @@ async def menu2_item_menu(call: CallbackQuery, state: FSMContext):
         await state.set_state(Settings.menu2_item)
         await state.update_data(measure_type="mp")
         msg = await call.message.answer(
-            f"Введите значение для {label} (м/п):"
+            f"Введите значение для {label} (м/п):",
+            reply_markup=cancel_kb(),
         )
         await state.update_data(prompt_id=msg.message_id)
     else:
         await state.set_state(Settings.menu2_item)
         unit_type = "шт"
-        msg = await call.message.answer(f"Введите значение для {label} ({unit_type}):")
+        msg = await call.message.answer(
+            f"Введите значение для {label} ({unit_type}):",
+            reply_markup=cancel_kb(),
+        )
         await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
@@ -1994,7 +2035,8 @@ async def menu2_unit_choice(call: CallbackQuery, state: FSMContext):
     await state.update_data(measure_type=choice)
     await state.set_state(Settings.menu2_item)
     msg = await call.message.answer(
-        f"Введите значение для {label} ({'м2' if choice == 'm2' else 'м/п'}):"
+        f"Введите значение для {label} ({'м2' if choice == 'm2' else 'м/п'}):",
+        reply_markup=cancel_kb(),
     )
     await state.update_data(prompt_id=msg.message_id)
     await call.message.delete()
@@ -2006,7 +2048,10 @@ async def countertop_unit_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.countertop_input)
     data = await state.get_data()
     await state.update_data(counter_unit=unit, menu2_message_id=data["menu2_message_id"])
-    msg = await call.message.answer(f"Введите значение столешницы для {unit}:")
+    msg = await call.message.answer(
+        f"Введите значение столешницы для {unit}:",
+        reply_markup=cancel_kb(),
+    )
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
@@ -2050,7 +2095,10 @@ async def wall_unit_menu(call: CallbackQuery, state: FSMContext):
     await state.set_state(Settings.wall_input)
     data = await state.get_data()
     await state.update_data(wall_unit=unit, menu2_message_id=data["menu2_message_id"])
-    msg = await call.message.answer(f"Введите значение стеновой для {unit}:")
+    msg = await call.message.answer(
+        f"Введите значение стеновой для {unit}:",
+        reply_markup=cancel_kb(),
+    )
     await state.update_data(prompt_id=msg.message_id)
     await call.answer()
 
@@ -2296,6 +2344,16 @@ async def menu3_takelage_input(call: CallbackQuery, state: FSMContext):
         ),
     )
     await call.answer(f"Такелаж: {choice}")
+
+
+async def cancel_input(call: CallbackQuery, state: FSMContext):
+    """Delete the prompt message when user presses 'Отмена'."""
+    data = await state.get_data()
+    prompt_id = data.get("prompt_id")
+    if prompt_id == call.message.message_id:
+        await state.update_data(prompt_id=None)
+    await call.message.delete()
+    await call.answer()
 
 
 # ─── где-то после всех существующих хендлеров (но до запуска dp.start_polling) ───
@@ -2611,6 +2669,7 @@ async def main():
     dp.callback_query.register(choose_stone, lambda c: c.data in {"settings_acryl", "settings_quartz"})
     dp.callback_query.register(show_settings, lambda c: c.data == "show_settings")
     dp.callback_query.register(back_home, lambda c: c.data == "back_home")
+    dp.callback_query.register(cancel_input, lambda c: c.data == "cancel_input")
 
     dp.callback_query.register(set_unit_menu, lambda c: c.data == "set_unit")
     dp.callback_query.register(unit_choice,   lambda c: c.data in ("unit_m2", "unit_mp"))
