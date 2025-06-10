@@ -1255,6 +1255,8 @@ async def back_to_menu2(call: CallbackQuery, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
+    km_val    = await get_menu3_km(chat_id)
+    takel_val = await get_menu2_takelage(chat_id)
     km_val = await get_menu3_km(chat_id)
     takel_val = await get_menu2_takelage(chat_id)
     await safe_edit_message_text(call.message.edit_text, 
@@ -1717,6 +1719,8 @@ async def stone2_selected(call: CallbackQuery, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
+    km_val    = await get_menu3_km(chat_id)
+    takel_val = await get_menu2_takelage(chat_id)
 
     await safe_edit_message_text(call.message.edit_text, 
         "Основное меню 2:",
@@ -1773,6 +1777,8 @@ async def stone_price_input(message: Message, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
+    km_val    = await get_menu3_km(chat_id)
+    takel_val = await get_menu2_takelage(chat_id)
 
     await safe_edit_message_text(message.bot.edit_message_text, 
         text="Основное меню 2:",
@@ -1971,6 +1977,8 @@ async def countertop_back(call: CallbackQuery, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
+    km_val    = await get_menu3_km(chat_id)
+    takel_val = await get_menu2_takelage(chat_id)
 
     await safe_edit_message_text(call.message.edit_text, 
         "Основное меню 2:",
@@ -2004,6 +2012,8 @@ async def wall_back(call: CallbackQuery, state: FSMContext):
     si   = await get_menu2_sink(chat_id)
     gl   = await get_menu2_glue(chat_id)
     ed   = await get_menu2_value(chat_id, "edges", "м/п")
+    km_val    = await get_menu3_km(chat_id)
+    takel_val = await get_menu2_takelage(chat_id)
 
     await safe_edit_message_text(call.message.edit_text, 
         "Основное меню 2:",
