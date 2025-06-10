@@ -4,7 +4,7 @@ import asyncio
 from db import connection, close_db
 
 from aiogram import Bot, Dispatcher
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -728,6 +728,7 @@ def home_menu() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="Настройки", callback_data="open_settings")],
             [InlineKeyboardButton(text="Список настроек", callback_data="show_settings")],
+            [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu2")],
         ]
     )
 
@@ -943,6 +944,52 @@ async def start_handler(message: Message, state: FSMContext):
         "Привет! Выберите действие:",
         reply_markup=home_menu(),
     )
+
+async def settings_command(message: Message, state: FSMContext):
+    """Handle /settings command by showing the main settings menu."""
+    await state.clear()
+    tax_value = await get_tax(message.chat.id)
+    mop_value = await get_menu3_mop(message.chat.id)
+    margin_value = await get_menu3_margin(message.chat.id)
+    fix = await get_measurement_fix(message.chat.id)
+    km = await get_measurement_km(message.chat.id)
+    await message.answer(
+        "Параметры:",
+        reply_markup=main_menu(tax_value, fix, km, mop_value, margin_value),
+    )
+
+async def calculation_command(message: Message, state: FSMContext):
+    """Handle /calculation command and open menu 2 for calculations."""
+    await state.set_state(Settings.menu2)
+    chat_id = message.chat.id
+    current_stone = await get_general_stone_type(chat_id)
+    current_price = await get_stone_price(chat_id)
+    unit = await get_unit(chat_id)
+    cntp_m2 = await get_menu2_value(chat_id, "countertop", "м2")
+    cntp_mp = await get_menu2_value(chat_id, "countertop", "м/п")
+    cntp = f"{cntp_m2} м2 | {cntp_mp} п/м"
+    wal_m2 = await get_menu2_value(chat_id, "wall", "м2")
+    wal_mp = await get_menu2_value(chat_id, "wall", "м/п")
+    wal = f"{wal_m2} м2 | {wal_mp} п/м"
+    bo = await get_menu2_boil(chat_id)
+    si = await get_menu2_sink(chat_id)
+    gl = await get_menu2_glue(chat_id)
+    ed = await get_menu2_value(chat_id, "edges", "м/п")
+    msg = await message.answer(
+        "Основное меню 2:",
+        reply_markup=menu2_kb(
+            current_stone,
+            current_price,
+            cntp,
+            wal,
+            bo,
+            si,
+            gl,
+            ed,
+            unit,
+        ),
+    )
+    await state.update_data(menu2_message_id=msg.message_id)
 
 async def open_settings(call: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -2350,6 +2397,8 @@ async def main():
 
     # Регистрация хендлеров
     dp.message.register(start_handler, CommandStart())
+    dp.message.register(settings_command, Command("settings"))
+    dp.message.register(calculation_command, Command("calculation"))
     dp.callback_query.register(open_settings, lambda c: c.data == "open_settings")
     dp.callback_query.register(show_settings, lambda c: c.data == "show_settings")
     dp.callback_query.register(back_home, lambda c: c.data == "back_home")
