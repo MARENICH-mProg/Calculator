@@ -1,6 +1,7 @@
 #API_TOKEN = "7908411125:AAFxJdhRYxke3mLVRa4Gxxy1Ow2dNk4Sf5w"
 
 import asyncio
+import logging
 from db import connection, close_db
 
 from aiogram import Bot, Dispatcher
@@ -16,6 +17,9 @@ from aiogram.types import (
 )
 from aiogram.exceptions import TelegramBadRequest
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 API_TOKEN = "7908411125:AAHubski9J1hUCWdNPhMYbljAkJ5cN7hF1k"
 
 async def safe_edit_message_text(func, *args, **kwargs):
@@ -24,7 +28,11 @@ async def safe_edit_message_text(func, *args, **kwargs):
         await func(*args, **kwargs)
     except TelegramBadRequest as e:
         if "message is not modified" not in str(e):
+            logger.exception("Failed to edit message text")
             raise
+    except Exception:
+        logger.exception("Failed to edit message text")
+        raise
 
 
 
@@ -969,6 +977,7 @@ def menu3_kb(km: str, takel: str) -> InlineKeyboardMarkup:
 
 # ─── 5) Хендлеры ───────────────────────────────────────────────
 async def start_handler(message: Message, state: FSMContext):
+    logger.info("/start from %s", message.chat.id)
     # Сбросим любое текущее состояние
     await state.clear()
 
@@ -979,6 +988,7 @@ async def start_handler(message: Message, state: FSMContext):
 
 async def settings_command(message: Message, state: FSMContext):
     """Handle /settings command by prompting to choose a stone type."""
+    logger.info("/settings from %s", message.chat.id)
     await state.clear()
     await state.set_state(Settings.choose_stone)
     await message.answer(
@@ -988,6 +998,7 @@ async def settings_command(message: Message, state: FSMContext):
 
 async def calculation_command(message: Message, state: FSMContext):
     """Handle /calculation command and open menu 2 for calculations."""
+    logger.info("/calculation from %s", message.chat.id)
     await state.set_state(Settings.menu2)
     chat_id = message.chat.id
     current_stone = await get_general_stone_type(chat_id)
