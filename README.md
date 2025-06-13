@@ -7,6 +7,8 @@ A Telegram bot that helps calculate the cost of stone products and salaries of w
 - **aiogram** (Telegram framework)
 - **aiosqlite** (async SQLite driver)
 
+All dependencies in requirements.txt have their versions pinned to ensure consistent installations.
+
 Install them with:
 
 ```bash
