@@ -19,7 +19,7 @@ from aiogram.exceptions import TelegramBadRequest
 API_TOKEN = "7908411125:AAHubski9J1hUCWdNPhMYbljAkJ5cN7hF1k"
 
 async def safe_edit_message_text(func, *args, **kwargs):
-    """Edit message text and ignore 'message is not modified' errors."""
+    """Edit message text and ignore 'message is not modified' errorsh."""
     try:
         await func(*args, **kwargs)
     except TelegramBadRequest as e:
