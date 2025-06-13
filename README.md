@@ -24,6 +24,9 @@ The bot stores user settings in `settings.db`. The database is created and initi
 ```bash
 python main.py
 ```
+The dispatcher uses long polling. The code sets `polling_timeout=1` so the bot
+responds quickly even after periods of inactivity. Adjust this value if you
+need a different balance between latency and network traffic.
 
 ## Main commands
 - `/start` — reset the state and open the main menu.

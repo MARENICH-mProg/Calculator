@@ -2748,7 +2748,7 @@ async def main():
 
     # Запускаем long-polling
     try:
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, polling_timeout=1)
     finally:
         await close_db()
         await bot.session.close()
