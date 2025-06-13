@@ -16,8 +16,7 @@ from aiogram.types import (
 )
 from aiogram.exceptions import TelegramBadRequest
 
-API_TOKEN = "7908411125:AAFxJdhRYxke3mLVRa4Gxxy1Ow2dNk4Sf5w"
-
+API_TOKEN = "7908411125:AAHubski9J1hUCWdNPhMYbljAkJ5cN7hF1k"
 
 async def safe_edit_message_text(func, *args, **kwargs):
     """Edit message text and ignore 'message is not modified' errors."""
@@ -719,8 +718,8 @@ def home_menu() -> InlineKeyboardMarkup:
     """Keyboard for the initial home screen."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Настройки", callback_data="open_settings")],
-            [InlineKeyboardButton(text="Список настроек", callback_data="show_settings")],
+            [InlineKeyboardButton(text="Настройки", callback_data="open_settings"),
+            InlineKeyboardButton(text="Список настроек", callback_data="show_settings")],
             [InlineKeyboardButton(text="Просчёт изделия", callback_data="to_menu2")],
         ]
     )
@@ -846,11 +845,9 @@ def salary_item_kb(role: str, stone: str, unit: str, values: dict[str,str]) -> I
     else:  # installer
         kb += [[
             InlineKeyboardButton(text=f"Столешница | {values['countertop']} | {unit}", callback_data=f"salary_{role}_{stone}_countertop")
-        ],[
-            InlineKeyboardButton(text=f"Стеновая | {values['wall']} | {unit}",       callback_data=f"salary_{role}_{stone}_wall")
-        ],[
-            InlineKeyboardButton(text=f"Доставка | фикс {values['delivery']} | км {values['delivery_km']}", callback_data=f"salary_{role}_{stone}_delivery"),
-            InlineKeyboardButton(text=f"Такелаж | {values['takelage']} | {unit}",     callback_data=f"salary_{role}_{stone}_takelage")
+        ],[InlineKeyboardButton(text=f"Стеновая | {values['wall']} | {unit}",       callback_data=f"salary_{role}_{stone}_wall")],
+            [InlineKeyboardButton(text=f"Доставка | фикс {values['delivery']} | км {values['delivery_km']}", callback_data=f"salary_{role}_{stone}_delivery")],
+            [InlineKeyboardButton(text=f"Такелаж | {values['takelage']} | {unit}",     callback_data=f"salary_{role}_{stone}_takelage")
         ]]
     kb.append([InlineKeyboardButton(text=f"Ед. измерения | {unit}", callback_data=f"salary_{role}_{stone}_unit")])
     kb.append([InlineKeyboardButton(text="← Назад", callback_data=f"salary_{role}_stone_back")])
@@ -2748,7 +2745,7 @@ async def main():
 
     # Запускаем long-polling
     try:
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, polling_timeout=1)
     finally:
         await close_db()
         await bot.session.close()
